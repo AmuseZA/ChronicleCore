@@ -1,0 +1,97 @@
+# ChronicleCore .gitignore
+
+# Temporary/Generated files
+.tmp/
+*.db
+*.db-shm
+*.db-wal
+
+# Build artifacts
+apps/chroniclecore-core/chroniclecore.exe
+apps/chroniclecore-core/chroniclecore
+apps/chroniclecore-ui/dist/
+apps/chroniclecore-ui/build/
+*.msix
+
+# Dependencies
+node_modules/
+vendor/
+
+# Environment & Secrets
+.env
+.env.local
+*.key
+*.pem
+credentials.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+venv/
+.venv/
+
+# Go
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+
+# Database backups (keep schema, not data)
+*.sql.backup
+chronicle_*.db
+
+# Installer build directories
+dist_installer/
+installer_output/
+
+# Large archive files
+*.zip
+
+# Embedded Python (large binary)
+python-embed/
+
+# Error logs
+*.err
+
+# SvelteKit build outputs
+apps/chroniclecore-ui/.svelte-kit/
+
+# Dist/release folders
+dist_release/
+
+# Node modules
+node_modules/
+
+# Other build scripts and workflow docs
+workflow/
+
+# Deploy folders with binaries
+deploy/
+dist/
+
+# Execution scripts
+execution/
+
+# Temp directories
+.tmp/

@@ -1,0 +1,611 @@
+openapi: 3.0.3
+info:
+  title: ChronicleCore Local API
+  description: |
+    Local-only REST API for ChronicleCore time tracking application.
+    All endpoints bind to 127.0.0.1 only. No remote access permitted.
+  version: 1.0.0
+  contact:
+    name: ChronicleCore
+servers:
+  - url: http://127.0.0.1:{port}
+    description: Local development server
+    variables:
+      port:
+        default: '8080'
+        description: Configurable port (default 8080)
+
+tags:
+  - name: System
+    description: System health and version
+  - name: Tracking
+    description: Activity tracking control
+  - name: Blocks
+    description: Time block management
+  - name: Profiles
+    description: Client/Profile/Service/Rate CRUD
+  - name: Rules
+    description: Assignment rules engine
+  - name: Exports
+    description: Data export (CSV, invoices)
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      tags: [System]
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+                  version:
+                    type: string
+                    example: "1.0.0"
+                  uptime_seconds:
+                    type: integer
+
+  /api/v1/tracking/status:
+    get:
+      summary: Get current tracking status
+      tags: [Tracking]
+      responses:
+        '200':
+          description: Current tracking state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrackingStatus'
+
+  /api/v1/tracking/start:
+    post:
+      summary: Start tracking
+      tags: [Tracking]
+      description: Begin capturing activity (requires tracking to be stopped)
+      responses:
+        '200':
+          description: Tracking started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrackingStatus'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/tracking/pause:
+    post:
+      summary: Pause tracking
+      tags: [Tracking]
+      description: Temporarily pause (requires active tracking)
+      responses:
+        '200':
+          description: Tracking paused
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrackingStatus'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/tracking/resume:
+    post:
+      summary: Resume tracking
+      tags: [Tracking]
+      description: Resume from paused state
+      responses:
+        '200':
+          description: Tracking resumed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrackingStatus'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/tracking/stop:
+    post:
+      summary: Stop tracking
+      tags: [Tracking]
+      description: Fully stop tracking (can restart later)
+      responses:
+        '200':
+          description: Tracking stopped
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrackingStatus'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/blocks:
+    get:
+      summary: List time blocks
+      tags: [Blocks]
+      parameters:
+        - name: date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Filter by date (YYYY-MM-DD). Defaults to today.
+        - name: profile_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Filter by profile
+        - name: unassigned
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: Show only unassigned blocks
+      responses:
+        '200':
+          description: List of blocks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Block'
+
+  /api/v1/blocks/{block_id}:
+    get:
+      summary: Get single block
+      tags: [Blocks]
+      parameters:
+        - $ref: '#/components/parameters/BlockId'
+      responses:
+        '200':
+          description: Block details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Block'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/blocks/{block_id}/reassign:
+    post:
+      summary: Reassign block to profile
+      tags: [Blocks]
+      parameters:
+        - $ref: '#/components/parameters/BlockId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [profile_id]
+              properties:
+                profile_id:
+                  type: integer
+                  nullable: true
+                  description: Target profile (null to unassign)
+                confidence:
+                  type: string
+                  enum: [HIGH, MEDIUM, LOW]
+                  default: HIGH
+      responses:
+        '200':
+          description: Block reassigned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Block'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/blocks/{block_id}/split:
+    post:
+      summary: Split block at timestamp
+      tags: [Blocks]
+      parameters:
+        - $ref: '#/components/parameters/BlockId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [split_at]
+              properties:
+                split_at:
+                  type: string
+                  format: date-time
+                  description: ISO-8601 timestamp to split at
+      responses:
+        '200':
+          description: Block split into two
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  first:
+                    $ref: '#/components/schemas/Block'
+                  second:
+                    $ref: '#/components/schemas/Block'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/blocks/merge:
+    post:
+      summary: Merge multiple blocks
+      tags: [Blocks]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [block_ids]
+              properties:
+                block_ids:
+                  type: array
+                  items:
+                    type: integer
+                  minItems: 2
+                  description: IDs of blocks to merge (must be contiguous)
+      responses:
+        '200':
+          description: Blocks merged
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Block'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/profiles:
+    get:
+      summary: List profiles
+      tags: [Profiles]
+      parameters:
+        - name: active_only
+          in: query
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: List of profiles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Profile'
+
+    post:
+      summary: Create profile
+      tags: [Profiles]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfileCreate'
+      responses:
+        '201':
+          description: Profile created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/profiles/{profile_id}:
+    get:
+      summary: Get profile
+      tags: [Profiles]
+      parameters:
+        - name: profile_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Profile details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      summary: Update profile
+      tags: [Profiles]
+      parameters:
+        - name: profile_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfileCreate'
+      responses:
+        '200':
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      summary: Delete profile
+      tags: [Profiles]
+      parameters:
+        - name: profile_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Profile deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/clients:
+    get:
+      summary: List clients
+      tags: [Profiles]
+      responses:
+        '200':
+          description: List of clients
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Client'
+
+    post:
+      summary: Create client
+      tags: [Profiles]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+      responses:
+        '201':
+          description: Client created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+
+  /api/v1/export/invoice-lines:
+    post:
+      summary: Export invoice CSV
+      tags: [Exports]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [start_date, end_date]
+              properties:
+                start_date:
+                  type: string
+                  format: date
+                end_date:
+                  type: string
+                  format: date
+                profile_ids:
+                  type: array
+                  items:
+                    type: integer
+                  description: Filter by profiles (optional)
+                rounding_minutes:
+                  type: integer
+                  enum: [6, 15]
+                  default: 6
+                  description: Rounding increment
+                minimum_billable_minutes:
+                  type: integer
+                  default: 0
+      responses:
+        '200':
+          description: CSV export
+          content:
+            text/csv:
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+components:
+  parameters:
+    BlockId:
+      name: block_id
+      in: path
+      required: true
+      schema:
+        type: integer
+
+  schemas:
+    TrackingStatus:
+      type: object
+      properties:
+        state:
+          type: string
+          enum: [STOPPED, ACTIVE, PAUSED]
+        last_active_at:
+          type: string
+          format: date-time
+          nullable: true
+        idle_seconds:
+          type: integer
+        current_window:
+          type: object
+          nullable: true
+          properties:
+            app_name:
+              type: string
+            title:
+              type: string
+
+    Block:
+      type: object
+      properties:
+        block_id:
+          type: integer
+        ts_start:
+          type: string
+          format: date-time
+        ts_end:
+          type: string
+          format: date-time
+        duration_minutes:
+          type: number
+          format: float
+        primary_app_name:
+          type: string
+        primary_domain:
+          type: string
+          nullable: true
+        title_summary:
+          type: string
+          nullable: true
+        profile_id:
+          type: integer
+          nullable: true
+        confidence:
+          type: string
+          enum: [HIGH, MEDIUM, LOW]
+        billable:
+          type: boolean
+        locked:
+          type: boolean
+        description:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+
+    Profile:
+      type: object
+      properties:
+        profile_id:
+          type: integer
+        client_name:
+          type: string
+        project_name:
+          type: string
+          nullable: true
+        service_name:
+          type: string
+        rate_name:
+          type: string
+        rate_amount:
+          type: number
+          description: Hourly rate in major units
+        currency:
+          type: string
+        is_active:
+          type: boolean
+
+    ProfileCreate:
+      type: object
+      required: [client_id, service_id, rate_id]
+      properties:
+        client_id:
+          type: integer
+        project_id:
+          type: integer
+          nullable: true
+        service_id:
+          type: integer
+        rate_id:
+          type: integer
+        name:
+          type: string
+          nullable: true
+
+    Client:
+      type: object
+      properties:
+        client_id:
+          type: integer
+        name:
+          type: string
+        is_active:
+          type: boolean
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum:
+                - INVALID_REQUEST
+                - NOT_FOUND
+                - INTERNAL_ERROR
+                - INVALID_STATE
+            message:
+              type: string
+            details:
+              type: object
+              additionalProperties: true
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: INVALID_REQUEST
+              message: Invalid parameter value
+              details: {}
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: NOT_FOUND
+              message: Resource not found
+              details: {}
+
+security: []

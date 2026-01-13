@@ -1,0 +1,6 @@
+ChronicleCore License
+
+Copyright (c) 2026 ChronicleCore
+
+This software is provided for personal use.
+All rights reserved.
