@@ -18,6 +18,7 @@ class HealthResponse(BaseModel):
 
 class TrainRequest(BaseModel):
     """Request to train a model"""
+    model_config = ConfigDict(protected_namespaces=())
     features: List[Dict[str, Any]] = Field(
         ...,
         description="List of feature dictionaries for each training sample"

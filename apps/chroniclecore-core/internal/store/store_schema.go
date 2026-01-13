@@ -73,6 +73,18 @@ func (s *Store) ensureSchema(db *sql.DB) error {
 		  ts                TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
 		  FOREIGN KEY (model_id) REFERENCES ml_model_registry(model_id) ON DELETE SET NULL
 		);`,
+
+		// 1.6.0 Migration: App Blacklist table
+		`CREATE TABLE IF NOT EXISTS app_blacklist (
+		  blacklist_id    INTEGER PRIMARY KEY,
+		  app_id          INTEGER NOT NULL UNIQUE,
+		  reason          TEXT,
+		  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+		  FOREIGN KEY (app_id) REFERENCES dict_app(app_id) ON DELETE CASCADE
+		);`,
+
+		// 1.6.0 Index for app_blacklist
+		`CREATE INDEX IF NOT EXISTS idx_app_blacklist_app ON app_blacklist (app_id);`,
 	}
 
 	for _, query := range queries {

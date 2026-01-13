@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	AppVersion  = "1.6.0"
+	AppVersion  = "1.6.1"
 	DefaultPort = "8080"
 	MLPort      = 8081
 )
