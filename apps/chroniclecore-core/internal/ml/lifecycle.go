@@ -1,6 +1,7 @@
 package ml
 
 import (
+	"bufio"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -83,16 +84,32 @@ func (sm *SidecarManager) Start() error {
 	sm.cmd.Env = append(os.Environ(),
 		fmt.Sprintf("CC_ML_TOKEN=%s", sm.token),
 		fmt.Sprintf("ML_PORT=%d", sm.port),
+		"PYTHONUNBUFFERED=1",
 	)
 
-	// Redirect output to logs
-	sm.cmd.Stdout = os.Stdout
-	sm.cmd.Stderr = os.Stderr
+	// Capture output
+	stdout, _ := sm.cmd.StdoutPipe()
+	stderr, _ := sm.cmd.StderrPipe()
 
 	// Start process
 	if err := sm.cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start sidecar: %w", err)
 	}
+
+	// Stream logs in background
+	go func() {
+		scanner := bufio.NewScanner(stdout)
+		for scanner.Scan() {
+			log.Printf("[ML Sidecar] %s", scanner.Text())
+		}
+	}()
+
+	go func() {
+		scanner := bufio.NewScanner(stderr)
+		for scanner.Scan() {
+			log.Printf("[ML Sidecar ERROR] %s", scanner.Text())
+		}
+	}()
 
 	sm.isRunning = true
 	log.Printf("ML sidecar started (PID: %d)", sm.cmd.Process.Pid)
@@ -198,7 +215,28 @@ func (sm *SidecarManager) waitForReady(timeout time.Duration) error {
 	client := NewClient(sm.port, sm.token)
 	deadline := time.Now().Add(timeout)
 
+	// Check for early exit
+	exitChan := make(chan error, 1)
+	go func() {
+		state, err := sm.cmd.Process.Wait()
+		if err != nil {
+			exitChan <- err
+		} else if !state.Success() {
+			exitChan <- fmt.Errorf("process exited with code %d", state.ExitCode())
+		} else {
+			exitChan <- fmt.Errorf("process exited unexpectedly")
+		}
+	}()
+
 	for time.Now().Before(deadline) {
+		// Check if process died
+		select {
+		case err := <-exitChan:
+			return fmt.Errorf("process died during startup: %w", err)
+		default:
+			// Continue
+		}
+
 		if err := client.HealthCheck(); err == nil {
 			return nil
 		}

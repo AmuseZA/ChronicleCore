@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	AppVersion          = "1.7.0"
+	AppVersion          = "1.7.1"
 	DefaultPort         = "8080"
 	MLPort              = 8081
 	UpdateCheckInterval = 30 * time.Minute
@@ -113,7 +113,7 @@ func main() {
 	// ---------------------------------------------------------
 	// Static File Handling (SPA)
 	// ---------------------------------------------------------
-	
+
 	// Get execution directory
 	exePath, _ := os.Executable()
 	exeDir := filepath.Dir(exePath)
@@ -136,7 +136,7 @@ func main() {
 		path := r.URL.Path
 
 		// API routes are handled by specific handlers registered below.
-		// If we get here, it means no specific API route matched yet 
+		// If we get here, it means no specific API route matched yet
 		// (wait, ServeMux matches longest pattern, so we need to be careful).
 		// Actually, ServeMux doesn't support regex/wildcard fallbacks easily.
 		// So we will register "/" to this handler, and it will serve files or index.html.
@@ -144,7 +144,7 @@ func main() {
 		// Check if file exists in webDir
 		cleanPath := filepath.Clean(path)
 		fullPath := filepath.Join(webDir, cleanPath)
-		
+
 		if fileExists(fullPath) {
 			// Serve static file
 			fileServer.ServeHTTP(w, r)
@@ -163,7 +163,6 @@ func main() {
 
 	// Register root handler for SPA
 	mux.Handle("/", spaHandler)
-
 
 	// Health endpoint
 	mux.HandleFunc("/health", handleHealth)

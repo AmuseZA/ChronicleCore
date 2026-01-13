@@ -27,45 +27,46 @@ type BlockDTO struct {
 	AppID           int64   `json:"app_id"` // Added for grouping
 	TsStart         string  `json:"ts_start"`
 	TsEnd           string  `json:"ts_end"`
+	DurationSeconds float64 `json:"duration_seconds"` // Added for precision
 	DurationMinutes float64 `json:"duration_minutes"`
 	DurationHours   float64 `json:"duration_hours"`
 
 	// App/Title/Domain info
-	PrimaryAppName  string  `json:"primary_app_name"`
-	PrimaryDomain   *string `json:"primary_domain,omitempty"`
-	TitleSummary    *string `json:"title_summary,omitempty"`
+	PrimaryAppName string  `json:"primary_app_name"`
+	PrimaryDomain  *string `json:"primary_domain,omitempty"`
+	TitleSummary   *string `json:"title_summary,omitempty"`
 
 	// Profile assignment
-	ProfileID       *int64  `json:"profile_id,omitempty"`
-	ClientName      *string `json:"client_name,omitempty"`
-	ProjectName     *string `json:"project_name,omitempty"`
-	ServiceName     *string `json:"service_name,omitempty"`
+	ProfileID   *int64  `json:"profile_id,omitempty"`
+	ClientName  *string `json:"client_name,omitempty"`
+	ProjectName *string `json:"project_name,omitempty"`
+	ServiceName *string `json:"service_name,omitempty"`
 
 	// Status
-	Confidence      string  `json:"confidence"`
-	Billable        bool    `json:"billable"`
-	Locked          bool    `json:"locked"`
+	Confidence string `json:"confidence"`
+	Billable   bool   `json:"billable"`
+	Locked     bool   `json:"locked"`
 
 	// Metadata
-	Notes           *string  `json:"notes,omitempty"`
-	Description     *string  `json:"description,omitempty"`
-	ActivityScore   *float64 `json:"activity_score,omitempty"` // Derived from metadata
-	CreatedAt       string   `json:"created_at"`
-	UpdatedAt       string   `json:"updated_at"`
+	Notes         *string  `json:"notes,omitempty"`
+	Description   *string  `json:"description,omitempty"`
+	ActivityScore *float64 `json:"activity_score,omitempty"` // Derived from metadata
+	CreatedAt     string   `json:"created_at"`
+	UpdatedAt     string   `json:"updated_at"`
 }
 
 // GroupedBlock represents blocks grouped by app+title context
 type GroupedBlock struct {
-	GroupKey        string     `json:"group_key"`         // Unique key for this group
-	PrimaryAppName  string     `json:"primary_app_name"`
-	AppID           int64      `json:"app_id"`
-	TitleContext    string     `json:"title_context"`     // Common title/context
-	TotalMinutes    float64    `json:"total_minutes"`
-	TotalHours      float64    `json:"total_hours"`
-	BlockCount      int        `json:"block_count"`
-	FirstTs         string     `json:"first_ts"`          // Earliest block
-	LastTs          string     `json:"last_ts"`           // Latest block
-	Blocks          []BlockDTO `json:"blocks"`            // Individual blocks in this group
+	GroupKey       string     `json:"group_key"` // Unique key for this group
+	PrimaryAppName string     `json:"primary_app_name"`
+	AppID          int64      `json:"app_id"`
+	TitleContext   string     `json:"title_context"` // Common title/context
+	TotalMinutes   float64    `json:"total_minutes"`
+	TotalHours     float64    `json:"total_hours"`
+	BlockCount     int        `json:"block_count"`
+	FirstTs        string     `json:"first_ts"` // Earliest block
+	LastTs         string     `json:"last_ts"`  // Latest block
+	Blocks         []BlockDTO `json:"blocks"`   // Individual blocks in this group
 }
 
 // PaginatedResponse wraps results with pagination info
@@ -81,7 +82,6 @@ type Pagination struct {
 	Total      int `json:"total"`
 	TotalPages int `json:"total_pages"`
 }
-
 
 // ListBlocks handles GET /api/v1/blocks with filters
 func (h *BlockHandler) ListBlocks(w http.ResponseWriter, r *http.Request) {
@@ -256,6 +256,7 @@ func (h *BlockHandler) ListBlocks(w http.ResponseWriter, r *http.Request) {
 
 		// Calculate duration
 		durationSeconds := end.Sub(start).Seconds()
+		b.DurationSeconds = durationSeconds
 		b.DurationMinutes = durationSeconds / 60.0
 		b.DurationHours = durationSeconds / 3600.0
 
@@ -291,7 +292,7 @@ func (h *BlockHandler) ListBlocks(w http.ResponseWriter, r *http.Request) {
 		if description.Valid {
 			b.Description = &description.String
 		}
-		
+
 		// Parse Activity Score from metadata
 		if metadata.Valid {
 			var metaMap map[string]interface{}
@@ -442,6 +443,7 @@ func (h *BlockHandler) ListGroupedBlocks(w http.ResponseWriter, r *http.Request)
 		start, _ := time.Parse(time.RFC3339, tsStart)
 		end, _ := time.Parse(time.RFC3339, tsEnd)
 		durationSeconds := end.Sub(start).Seconds()
+		b.DurationSeconds = durationSeconds
 		b.DurationMinutes = durationSeconds / 60.0
 		b.DurationHours = durationSeconds / 3600.0
 		b.TsStart = tsStart
@@ -715,11 +717,11 @@ func (h *BlockHandler) ReassignBlock(w http.ResponseWriter, r *http.Request) {
 	}
 
 	auditDetails := map[string]interface{}{
-		"block_id":        blockID,
-		"old_profile_id":  oldPID,
-		"new_profile_id":  req.ProfileID,
-		"old_confidence":  oldConfidence,
-		"new_confidence":  req.Confidence,
+		"block_id":       blockID,
+		"old_profile_id": oldPID,
+		"new_profile_id": req.ProfileID,
+		"old_confidence": oldConfidence,
+		"new_confidence": req.Confidence,
 	}
 
 	h.writeAuditLog("REASSIGN_BLOCK", auditDetails)
@@ -837,7 +839,7 @@ func (h *BlockHandler) DeleteBlock(w http.ResponseWriter, r *http.Request) {
 	// Parse block ID
 	// Path is /api/v1/blocks/{id}
 	idStr := strings.TrimPrefix(r.URL.Path, "/api/v1/blocks/")
-	
+
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		http.Error(w, "Invalid block ID", http.StatusBadRequest)
@@ -992,10 +994,10 @@ func (h *BlockHandler) writeAuditLog(action string, details interface{}) {
 // ManualEntryRequest represents a request to create a manual time entry
 type ManualEntryRequest struct {
 	ProfileID   int64  `json:"profile_id"`
-	TsStart     string `json:"ts_start"`     // ISO-8601 format
-	TsEnd       string `json:"ts_end"`       // ISO-8601 format
-	Title       string `json:"title"`        // e.g., "Phone call with Client ABC"
-	Description string `json:"description"`  // Optional detailed description
+	TsStart     string `json:"ts_start"`    // ISO-8601 format
+	TsEnd       string `json:"ts_end"`      // ISO-8601 format
+	Title       string `json:"title"`       // e.g., "Phone call with Client ABC"
+	Description string `json:"description"` // Optional detailed description
 	Billable    bool   `json:"billable"`
 }
 

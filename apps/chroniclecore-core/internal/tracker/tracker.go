@@ -28,16 +28,16 @@ type Config struct {
 
 // Tracker manages activity tracking
 type Tracker struct {
-	config         Config
-	state          State
-	mu             sync.RWMutex
-	ctx            context.Context
-	cancel         context.CancelFunc
-	lastActiveAt     *time.Time
-	currentWindow    *WindowInfo
-	currentEventID   int64 // Track current open event
-	activitySamples  int   // Total samples in current poll interval
-	activeSampleCount int  // Number of samples where user was active
+	config            Config
+	state             State
+	mu                sync.RWMutex
+	ctx               context.Context
+	cancel            context.CancelFunc
+	lastActiveAt      *time.Time
+	currentWindow     *WindowInfo
+	currentEventID    int64 // Track current open event
+	activitySamples   int   // Total samples in current poll interval
+	activeSampleCount int   // Number of samples where user was active
 }
 
 // Status represents current tracker status
@@ -169,13 +169,13 @@ func (t *Tracker) trackLoop() {
 		select {
 		case <-t.ctx.Done():
 			return
-		
+
 		case <-sampleTicker.C:
 			// High-freq sampling for activity meter
 			if t.state != StateActive {
 				continue
 			}
-			
+
 			currentIdleMs, err := GetIdleTime()
 			if err != nil {
 				continue
@@ -183,13 +183,13 @@ func (t *Tracker) trackLoop() {
 
 			t.mu.Lock()
 			t.activitySamples++
-			
+
 			// If idle time DECREASED, user did something (moved mouse, typed)
 			// Or if idle time is very small (< 100ms), they are currently doing something
 			if currentIdleMs < lastIdleMs || currentIdleMs < 100 {
 				t.activeSampleCount++
 			}
-			
+
 			lastIdleMs = currentIdleMs
 			t.mu.Unlock()
 
@@ -214,7 +214,7 @@ func (t *Tracker) capture() {
 	if t.activitySamples > 0 {
 		activityScore = float64(t.activeSampleCount) / float64(t.activitySamples)
 	}
-	
+
 	// Reset counters for next interval
 	t.activitySamples = 0
 	t.activeSampleCount = 0
@@ -253,8 +253,21 @@ func (t *Tracker) capture() {
 		}
 	}
 
+	// Update current window info with resolved IDs and State BEFORE checking for change
+	// This ensures t.currentWindow has the "new" state to compare against the "previous" state
+	// Wait, t.currentWindow holds the window from the *previous* capture iteration.
+	// We need to compare "previous" (t.currentWindow) vs "current" (winInfo).
+	// So we should NOT overwrite t.currentWindow yet.
+
 	// Check if context has changed (different app/title or state change)
 	contextChanged := t.shouldStartNewEvent(appID, titleID, eventState)
+
+	// Update t.currentWindow for next iteration
+	// We need to store specific fields for comparison next time
+	winInfo.AppID = appID
+	winInfo.TitleID = titleID
+	winInfo.State = eventState
+	t.currentWindow = winInfo // Now it becomes the "last" window for next loop
 
 	if contextChanged {
 		// Close previous event if open
@@ -284,9 +297,12 @@ func (t *Tracker) capture() {
 
 		t.currentEventID = event.EventID
 		t.lastActiveAt = &now
+	} else {
+		// If NOT changed, we should ideally update the lastActiveAt of the *current event*?
+		// No, lastActiveAt is global for the tracker status.
 	}
 
-	// Update last active time if not idle
+	// Update global last active time if not idle
 	if !winInfo.IsIdle {
 		t.lastActiveAt = &now
 	}
@@ -299,9 +315,28 @@ func (t *Tracker) shouldStartNewEvent(appID int64, titleID *int64, state string)
 		return true
 	}
 
-	// For MVP: Start new event on any context change
-	// TODO: Implement more sophisticated logic (e.g., allow minor title changes within same app)
-	return true
+	// If we have no previous window info, start new
+	if t.currentWindow == nil {
+		return true
+	}
+
+	// Helper to check if titleIDs differ (handling nil pointers)
+	titlesDiffer := false
+	if (t.currentWindow.TitleID == nil && titleID != nil) ||
+		(t.currentWindow.TitleID != nil && titleID == nil) {
+		titlesDiffer = true
+	} else if t.currentWindow.TitleID != nil && titleID != nil {
+		titlesDiffer = *t.currentWindow.TitleID != *titleID
+	}
+
+	// Check if context has changed
+	if t.currentWindow.AppID != appID ||
+		titlesDiffer ||
+		t.currentWindow.State != state {
+		return true
+	}
+
+	return false
 }
 
 // closeCurrentEvent closes the currently open event

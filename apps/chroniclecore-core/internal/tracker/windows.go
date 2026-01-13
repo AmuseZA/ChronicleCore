@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 package tracker
@@ -11,15 +12,15 @@ import (
 )
 
 var (
-	user32               = windows.NewLazySystemDLL("user32.dll")
-	kernel32             = windows.NewLazySystemDLL("kernel32.dll")
-	procGetForegroundWindow = user32.NewProc("GetForegroundWindow")
-	procGetWindowText       = user32.NewProc("GetWindowTextW")
-	procGetWindowThreadProcessId = user32.NewProc("GetWindowThreadProcessId")
-	procOpenProcess         = kernel32.NewProc("OpenProcess")
+	user32                        = windows.NewLazySystemDLL("user32.dll")
+	kernel32                      = windows.NewLazySystemDLL("kernel32.dll")
+	procGetForegroundWindow       = user32.NewProc("GetForegroundWindow")
+	procGetWindowText             = user32.NewProc("GetWindowTextW")
+	procGetWindowThreadProcessId  = user32.NewProc("GetWindowThreadProcessId")
+	procOpenProcess               = kernel32.NewProc("OpenProcess")
 	procQueryFullProcessImageName = kernel32.NewProc("QueryFullProcessImageNameW")
-	procGetLastInputInfo    = user32.NewProc("GetLastInputInfo")
-	procGetTickCount        = kernel32.NewProc("GetTickCount")
+	procGetLastInputInfo          = user32.NewProc("GetLastInputInfo")
+	procGetTickCount              = kernel32.NewProc("GetTickCount")
 )
 
 const (
@@ -39,6 +40,9 @@ type WindowInfo struct {
 	WindowTitle string
 	IsIdle      bool
 	IdleSeconds int
+	AppID       int64  // Resolved App ID
+	TitleID     *int64 // Resolved Title ID
+	State       string // ACTIVE or IDLE
 }
 
 // GetForegroundWindow returns the handle of the foreground window
