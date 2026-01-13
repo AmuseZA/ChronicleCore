@@ -17,7 +17,7 @@ Write-Host ""
 $RootDir = $PSScriptRoot
 $DistDir = Join-Path $RootDir "dist_installer"
 $PythonDir = Join-Path $DistDir "python"
-$BackendExe = Join-Path $RootDir "apps\chroniclecore-core\chroniclecore.exe"
+$BackendExe = Join-Path $RootDir "apps\chroniclecore-core\bin\chroniclecore-core.exe"
 
 # Clean previous build
 if (Test-Path $DistDir) {
