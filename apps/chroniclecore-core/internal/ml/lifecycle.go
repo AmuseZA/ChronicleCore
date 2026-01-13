@@ -98,16 +98,28 @@ func (sm *SidecarManager) Start() error {
 
 	// Stream logs in background
 	go func() {
-		scanner := bufio.NewScanner(stdout)
-		for scanner.Scan() {
-			log.Printf("[ML Sidecar] %s", scanner.Text())
+		reader := bufio.NewReader(stdout)
+		for {
+			line, err := reader.ReadString('\n')
+			if line != "" {
+				log.Printf("[ML Sidecar] %s", line)
+			}
+			if err != nil {
+				return
+			}
 		}
 	}()
 
 	go func() {
-		scanner := bufio.NewScanner(stderr)
-		for scanner.Scan() {
-			log.Printf("[ML Sidecar ERROR] %s", scanner.Text())
+		reader := bufio.NewReader(stderr)
+		for {
+			line, err := reader.ReadString('\n')
+			if line != "" {
+				log.Printf("[ML Sidecar ERROR] %s", line)
+			}
+			if err != nil {
+				return
+			}
 		}
 	}()
 

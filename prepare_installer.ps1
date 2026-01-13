@@ -247,6 +247,56 @@ $launcherScript | Set-Content (Join-Path $DistDir "ChronicleCore.bat")
 Write-Host "   Launcher created!" -ForegroundColor Green
 Write-Host ""
 
+# Create Debug ML script
+Write-Host "Creating debug_ml script..." -ForegroundColor Yellow
+$debugMlScript = @'
+@echo off
+title ChronicleCore ML Debugger
+echo ============================================================
+echo   ChronicleCore ML Sidecar Debugger
+echo ============================================================
+echo.
+echo Setting up environment...
+set "APP_DIR=%~dp0"
+cd /d "%APP_DIR%"
+
+set "PYTHONUNBUFFERED=1"
+set "ML_PORT=8081"
+set "CC_ML_TOKEN=debug_token"
+
+echo.
+echo Checking Python...
+if not exist "python\python.exe" (
+    echo ERROR: python\python.exe not found!
+    pause
+    exit /b 1
+)
+"python\python.exe" --version
+
+echo.
+echo Checking ML directory...
+if not exist "ml\src\main.py" (
+    echo ERROR: ml\src\main.py not found!
+    pause
+    exit /b 1
+)
+
+echo.
+echo Starting Uvicorn...
+echo Command: python\python.exe -m uvicorn src.main:app --host 127.0.0.1 --port 8081 --log-level debug --app-dir ml
+echo.
+echo ------------------------------------------------------------
+cd ml
+"..\python\python.exe" -m uvicorn src.main:app --host 127.0.0.1 --port 8081 --log-level debug
+echo ------------------------------------------------------------
+echo.
+echo Sidecar exited with code %errorlevel%
+pause
+'@
+$debugMlScript | Set-Content (Join-Path $DistDir "debug_ml.bat")
+Write-Host "   Debug script created!" -ForegroundColor Green
+Write-Host ""
+
 # Update VERSION.txt
 $Version | Set-Content (Join-Path $RootDir "VERSION.txt")
 
