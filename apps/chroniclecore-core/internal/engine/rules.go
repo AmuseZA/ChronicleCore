@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+	"time"
 
 	"chroniclecore/internal/store"
 )
@@ -257,11 +258,12 @@ func (re *RuleEngine) AssignBlocksInRange() error {
 		var b store.Block
 		var profileID sql.NullInt64
 		var domainID, titleID sql.NullInt64
+		var tsStartStr, tsEndStr string
 
 		err := rows.Scan(
 			&b.BlockID,
-			&b.TsStart,
-			&b.TsEnd,
+			&tsStartStr,
+			&tsEndStr,
 			&b.PrimaryAppID,
 			&domainID,
 			&titleID,
@@ -273,6 +275,10 @@ func (re *RuleEngine) AssignBlocksInRange() error {
 		if err != nil {
 			return fmt.Errorf("failed to scan block: %w", err)
 		}
+
+		// Parse timestamps from SQLite string format
+		b.TsStart, _ = time.Parse(time.RFC3339, tsStartStr)
+		b.TsEnd, _ = time.Parse(time.RFC3339, tsEndStr)
 
 		if domainID.Valid {
 			did := domainID.Int64

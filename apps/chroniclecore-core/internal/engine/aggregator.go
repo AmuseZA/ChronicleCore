@@ -11,6 +11,12 @@ import (
 	"chroniclecore/internal/store"
 )
 
+// Noise filtering constants
+const (
+	MinBlockDuration = 30 * time.Second // Minimum duration to create a block
+	MaxMergeGap      = 2 * time.Minute  // Maximum gap to merge same-app events
+)
+
 // Aggregator handles rollup of raw events into blocks
 type Aggregator struct {
 	store          *store.Store
@@ -248,9 +254,9 @@ func newBlockBuilder(event *store.RawEvent) *blockBuilder {
 
 // canMerge checks if an event can be merged into this block
 func (bb *blockBuilder) canMerge(event *store.RawEvent) bool {
-	// Same app and contiguous time (within 1 minute gap)
+	// Same app and contiguous time (within MaxMergeGap - default 2 minutes)
 	gap := event.TsStart.Sub(bb.tsEnd)
-	return event.AppID == bb.primaryAppID && gap < 1*time.Minute
+	return event.AppID == bb.primaryAppID && gap < MaxMergeGap
 }
 
 // merge adds an event to the current block
@@ -290,6 +296,12 @@ func (bb *blockBuilder) merge(event *store.RawEvent) {
 func (bb *blockBuilder) build() *store.Block {
 	// Skip blocks with no active time (pure idle)
 	if !bb.hasActiveTime {
+		return nil
+	}
+
+	// Skip blocks under minimum duration (noise filtering)
+	duration := bb.tsEnd.Sub(bb.tsStart)
+	if duration < MinBlockDuration {
 		return nil
 	}
 

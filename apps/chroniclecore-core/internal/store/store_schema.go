@@ -85,6 +85,17 @@ func (s *Store) ensureSchema(db *sql.DB) error {
 
 		// 1.6.0 Index for app_blacklist
 		`CREATE INDEX IF NOT EXISTS idx_app_blacklist_app ON app_blacklist (app_id);`,
+
+		// 1.7.0 Migration: Manual entries support
+		`ALTER TABLE block ADD COLUMN is_manual INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE block ADD COLUMN manual_title TEXT`,
+
+		// 1.7.0 Migration: Enhanced activity tracking
+		`ALTER TABLE block ADD COLUMN action_type TEXT`,
+		`ALTER TABLE block ADD COLUMN entity_context TEXT`,
+
+		// 1.7.0 Index for manual entries
+		`CREATE INDEX IF NOT EXISTS idx_block_is_manual ON block (is_manual);`,
 	}
 
 	for _, query := range queries {

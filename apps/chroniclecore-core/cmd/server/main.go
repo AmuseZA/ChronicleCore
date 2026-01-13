@@ -177,6 +177,7 @@ func main() {
 	// Data endpoints
 	mux.HandleFunc("/api/v1/blocks", blockHandler.ListBlocks)
 	mux.HandleFunc("/api/v1/blocks/grouped", blockHandler.ListGroupedBlocks)
+	mux.HandleFunc("/api/v1/blocks/manual", blockHandler.CreateManualEntry)
 	mux.HandleFunc("/api/v1/blocks/", func(w http.ResponseWriter, r *http.Request) {
 		// Route based on path suffix
 		path := r.URL.Path

@@ -147,8 +147,22 @@ func (sm *SidecarManager) Stop() error {
 	return nil
 }
 
-// IsRunning returns whether the sidecar is currently running
+// IsRunning returns whether the sidecar is currently running and healthy
 func (sm *SidecarManager) IsRunning() bool {
+	if !sm.isRunning {
+		return false
+	}
+	// Actually verify with health check
+	client := NewClient(sm.port, sm.token)
+	if err := client.HealthCheck(); err != nil {
+		log.Printf("ML sidecar health check failed: %v", err)
+		return false
+	}
+	return true
+}
+
+// IsProcessRunning returns whether the process flag indicates running (without health check)
+func (sm *SidecarManager) IsProcessRunning() bool {
 	return sm.isRunning
 }
 

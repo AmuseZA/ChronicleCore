@@ -119,6 +119,17 @@ func (h *MLHandler) GetTrainingData(w http.ResponseWriter, r *http.Request) {
 func (h *MLHandler) TriggerTraining(w http.ResponseWriter, r *http.Request) {
 	log.Println("Triggering ML training...")
 
+	// Ensure sidecar is running
+	if !h.sidecar.IsRunning() {
+		log.Println("ML sidecar not running, attempting to start...")
+		if err := h.sidecar.Restart(); err != nil {
+			log.Printf("Failed to start ML sidecar: %v", err)
+			http.Error(w, fmt.Sprintf("ML service unavailable: %v", err), http.StatusServiceUnavailable)
+			return
+		}
+		log.Println("ML sidecar started successfully")
+	}
+
 	// Get training data
 	query := `
 		SELECT
@@ -422,7 +433,10 @@ func (h *MLHandler) AcceptSuggestion(w http.ResponseWriter, r *http.Request) {
 
 	// Parse payload
 	var payload map[string]interface{}
-	json.Unmarshal([]byte(payloadJSON), &payload)
+	if err := json.Unmarshal([]byte(payloadJSON), &payload); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to parse suggestion payload: %v", err), http.StatusInternalServerError)
+		return
+	}
 
 	// Apply suggestion based on type
 	tx, err := h.db.Begin()
@@ -433,8 +447,19 @@ func (h *MLHandler) AcceptSuggestion(w http.ResponseWriter, r *http.Request) {
 	defer tx.Rollback()
 
 	if suggestionType == "PROFILE_ASSIGN" && entityType == "BLOCK" {
-		profileID := int(payload["predicted_profile_id"].(float64))
-		confidenceLevel := payload["confidence_level"].(string)
+		// Safely extract profile ID with type checking
+		predictedID, ok := payload["predicted_profile_id"].(float64)
+		if !ok {
+			http.Error(w, "Invalid suggestion payload: missing predicted_profile_id", http.StatusInternalServerError)
+			return
+		}
+		profileID := int(predictedID)
+
+		// Safely extract confidence level with fallback
+		confidenceLevel, ok := payload["confidence_level"].(string)
+		if !ok {
+			confidenceLevel = "MEDIUM" // Fallback
+		}
 
 		// Update block
 		_, err = tx.Exec(`

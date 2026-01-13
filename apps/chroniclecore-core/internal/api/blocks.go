@@ -988,3 +988,158 @@ func (h *BlockHandler) writeAuditLog(action string, details interface{}) {
 		log.Printf("Failed to write audit log: %v", err)
 	}
 }
+
+// ManualEntryRequest represents a request to create a manual time entry
+type ManualEntryRequest struct {
+	ProfileID   int64  `json:"profile_id"`
+	TsStart     string `json:"ts_start"`     // ISO-8601 format
+	TsEnd       string `json:"ts_end"`       // ISO-8601 format
+	Title       string `json:"title"`        // e.g., "Phone call with Client ABC"
+	Description string `json:"description"`  // Optional detailed description
+	Billable    bool   `json:"billable"`
+}
+
+// CreateManualEntry handles POST /api/v1/blocks/manual
+func (h *BlockHandler) CreateManualEntry(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req ManualEntryRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, "Invalid JSON: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Validate required fields
+	if req.ProfileID == 0 {
+		respondError(w, "profile_id is required", http.StatusBadRequest)
+		return
+	}
+	if req.Title == "" {
+		respondError(w, "title is required", http.StatusBadRequest)
+		return
+	}
+	if req.TsStart == "" || req.TsEnd == "" {
+		respondError(w, "ts_start and ts_end are required", http.StatusBadRequest)
+		return
+	}
+
+	// Parse timestamps
+	tsStart, err := time.Parse(time.RFC3339, req.TsStart)
+	if err != nil {
+		respondError(w, "Invalid ts_start format. Use ISO-8601 (e.g., 2026-01-13T09:00:00Z)", http.StatusBadRequest)
+		return
+	}
+	tsEnd, err := time.Parse(time.RFC3339, req.TsEnd)
+	if err != nil {
+		respondError(w, "Invalid ts_end format. Use ISO-8601 (e.g., 2026-01-13T10:00:00Z)", http.StatusBadRequest)
+		return
+	}
+
+	// Validate time range
+	if !tsEnd.After(tsStart) {
+		respondError(w, "ts_end must be after ts_start", http.StatusBadRequest)
+		return
+	}
+
+	// Don't allow times more than 1 hour in the future
+	if tsStart.After(time.Now().Add(1 * time.Hour)) {
+		respondError(w, "ts_start cannot be more than 1 hour in the future", http.StatusBadRequest)
+		return
+	}
+
+	// Verify profile exists
+	var profileExists int
+	err = h.store.GetDB().QueryRow("SELECT 1 FROM profile WHERE profile_id = ?", req.ProfileID).Scan(&profileExists)
+	if err != nil {
+		respondError(w, "Profile not found", http.StatusBadRequest)
+		return
+	}
+
+	// Get or create a "Manual Entry" app in dict_app
+	var manualAppID int64
+	err = h.store.GetDB().QueryRow("SELECT app_id FROM dict_app WHERE app_name = 'Manual Entry'").Scan(&manualAppID)
+	if err == sql.ErrNoRows {
+		result, err := h.store.GetDB().Exec("INSERT INTO dict_app (app_name) VALUES ('Manual Entry')")
+		if err != nil {
+			log.Printf("Failed to create Manual Entry app: %v", err)
+			respondError(w, "Failed to create manual entry", http.StatusInternalServerError)
+			return
+		}
+		manualAppID, _ = result.LastInsertId()
+	} else if err != nil {
+		log.Printf("Failed to lookup Manual Entry app: %v", err)
+		respondError(w, "Failed to create manual entry", http.StatusInternalServerError)
+		return
+	}
+
+	// Get or create title in dict_title
+	var titleID int64
+	err = h.store.GetDB().QueryRow("SELECT title_id FROM dict_title WHERE title_text = ?", req.Title).Scan(&titleID)
+	if err == sql.ErrNoRows {
+		result, err := h.store.GetDB().Exec("INSERT INTO dict_title (title_text) VALUES (?)", req.Title)
+		if err != nil {
+			log.Printf("Failed to create title: %v", err)
+			respondError(w, "Failed to create manual entry", http.StatusInternalServerError)
+			return
+		}
+		titleID, _ = result.LastInsertId()
+	} else if err != nil {
+		log.Printf("Failed to lookup title: %v", err)
+		respondError(w, "Failed to create manual entry", http.StatusInternalServerError)
+		return
+	}
+
+	// Build description
+	description := req.Description
+	if description == "" {
+		description = req.Title
+	}
+
+	// Insert manual block
+	result, err := h.store.GetDB().Exec(`
+		INSERT INTO block (
+			ts_start, ts_end, primary_app_id, title_summary_id, profile_id,
+			confidence, billable, locked, description, is_manual, manual_title
+		) VALUES (?, ?, ?, ?, ?, 'HIGH', ?, 0, ?, 1, ?)
+	`,
+		tsStart.Format(time.RFC3339),
+		tsEnd.Format(time.RFC3339),
+		manualAppID,
+		titleID,
+		req.ProfileID,
+		req.Billable,
+		description,
+		req.Title,
+	)
+
+	if err != nil {
+		log.Printf("Failed to insert manual entry: %v", err)
+		respondError(w, "Failed to create manual entry", http.StatusInternalServerError)
+		return
+	}
+
+	blockID, _ := result.LastInsertId()
+
+	// Write audit log
+	h.writeAuditLog("CREATE_MANUAL_ENTRY", map[string]interface{}{
+		"block_id":   blockID,
+		"profile_id": req.ProfileID,
+		"title":      req.Title,
+		"ts_start":   req.TsStart,
+		"ts_end":     req.TsEnd,
+		"billable":   req.Billable,
+	})
+
+	log.Printf("Created manual entry: block_id=%d, profile=%d, title=%s", blockID, req.ProfileID, req.Title)
+
+	// Return created block
+	blocks := h.getBlocksByIDs([]int64{blockID})
+	if len(blocks) > 0 {
+		respondJSON(w, blocks[0], http.StatusCreated)
+	} else {
+		respondJSON(w, map[string]interface{}{"block_id": blockID, "success": true}, http.StatusCreated)
+	}
+}
