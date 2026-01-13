@@ -98,9 +98,26 @@
         <h2 class="text-lg font-semibold text-slate-900 mb-4">
             Tracking Preferences
         </h2>
-        <p class="text-sm text-slate-500">
-            These settings are currently managed via the config file
-            `config.yaml`. UI configuration coming soon.
-        </p>
+        <div class="space-y-4">
+            <div
+                class="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-100"
+            >
+                <div>
+                    <h3 class="font-medium text-slate-900">
+                        Blacklist Management
+                    </h3>
+                    <p class="text-sm text-slate-500">
+                        Manage applications that are ignored by the usage
+                        tracker.
+                    </p>
+                </div>
+                <a
+                    href="/settings/blacklist"
+                    class="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 hover:text-slate-900 font-medium text-sm transition-colors shadow-sm"
+                >
+                    Manage Blacklist
+                </a>
+            </div>
+        </div>
     </div>
 </div>
