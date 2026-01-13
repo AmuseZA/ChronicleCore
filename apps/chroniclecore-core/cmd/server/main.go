@@ -24,9 +24,10 @@ import (
 )
 
 const (
-	AppVersion  = "1.6.1"
-	DefaultPort = "8080"
-	MLPort      = 8081
+	AppVersion          = "1.7.0"
+	DefaultPort         = "8080"
+	MLPort              = 8081
+	UpdateCheckInterval = 30 * time.Minute
 )
 
 var (
@@ -296,6 +297,9 @@ func main() {
 		}
 	}()
 
+	// Start periodic update checker (every 30 minutes after initial check)
+	go startUpdateChecker()
+
 	<-done
 	log.Println("Server shutting down...")
 
@@ -522,4 +526,59 @@ func handleTrackingStop(w http.ResponseWriter, r *http.Request) {
 	}
 
 	handleTrackingStatus(w, &http.Request{Method: "GET"})
+}
+
+// startUpdateChecker runs periodic update checks
+func startUpdateChecker() {
+	// Initial check after 1 minute (give server time to fully start)
+	time.Sleep(1 * time.Minute)
+	checkForUpdateBackground()
+
+	// Then check every 30 minutes
+	ticker := time.NewTicker(UpdateCheckInterval)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		checkForUpdateBackground()
+	}
+}
+
+// checkForUpdateBackground checks GitHub for updates and logs if one is available
+func checkForUpdateBackground() {
+	client := &http.Client{Timeout: 10 * time.Second}
+	url := "https://api.github.com/repos/AmuseZA/ChronicleCore/releases/latest"
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return
+	}
+
+	req.Header.Set("User-Agent", "ChronicleCore/"+AppVersion)
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("Update check failed: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return
+	}
+
+	var release struct {
+		TagName string `json:"tag_name"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return
+	}
+
+	latestVersion := strings.TrimPrefix(release.TagName, "v")
+
+	// Simple version comparison
+	if latestVersion != AppVersion && latestVersion > AppVersion {
+		log.Printf("🔔 Update available: v%s -> v%s (check Settings to download)", AppVersion, latestVersion)
+	}
 }
