@@ -136,8 +136,14 @@ try:
     import numpy
     import pydantic
     import httpx
+    # Deep import check to verify DLLs
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.feature_extraction.text import TfidfVectorizer
     print('OK')
 except ImportError as e:
+    print(f'ERROR: {e}')
+    exit(1)
+except Exception as e:
     print(f'ERROR: {e}')
     exit(1)
 "@

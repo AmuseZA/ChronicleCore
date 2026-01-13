@@ -171,7 +171,8 @@
                             </div>
                         </div>
                         <button
-                            on:click={() => removeFromBlacklist(item.id)}
+                            on:click={() =>
+                                removeFromBlacklist(item.blacklist_id)}
                             class="text-red-600 hover:text-red-700 text-sm font-medium px-3 py-1 rounded hover:bg-red-50 transition-colors"
                         >
                             Remove

@@ -79,9 +79,17 @@ class MLService:
         texts = self._extract_text_features(features)
 
         # Split for validation
-        X_train, X_val, y_train, y_val = train_test_split(
-            texts, labels, test_size=0.2, random_state=42, stratify=labels
-        )
+        # Note: stratify=labels removed to prevent errors when some classes have too few samples (<2)
+        try:
+            X_train, X_val, y_train, y_val = train_test_split(
+                texts, labels, test_size=0.2, random_state=42
+            )
+        except Exception as e:
+            logger.error(f"Split failed: {e}")
+            # Fallback to simple slice if split fails
+            split_idx = int(len(texts) * 0.8)
+            X_train, X_val = texts[:split_idx], texts[split_idx:]
+            y_train, y_val = labels[:split_idx], labels[split_idx:]
 
         # TF-IDF vectorization
         self.vectorizer = TfidfVectorizer(
