@@ -2,7 +2,7 @@
 ; Creates a single-EXE installer with everything embedded
 
 #define MyAppName "ChronicleCore"
-#define MyAppVersion "1.7.4"
+#define MyAppVersion "1.7.5"
 #define MyAppPublisher "ChronicleCore"
 #define MyAppExeName "ChronicleCore.bat"
 #define MyAppURL "https://github.com/yourusername/chroniclecore"
@@ -46,6 +46,7 @@ Source: "dist_installer\web\*"; DestDir: "{app}\web"; Flags: ignoreversion recur
 
 ; Launcher script
 Source: "dist_installer\ChronicleCore.bat"; DestDir: "{app}"; Flags: ignoreversion
+Source: "dist_installer\debug_ml.bat"; DestDir: "{app}"; Flags: ignoreversion
 
 ; Embedded Python
 Source: "dist_installer\python\*"; DestDir: "{app}\python"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -136,6 +137,7 @@ Type: filesandordirs; Name: "{app}"
 ; Store installation info for updates
 Root: HKCU; Subkey: "Software\ChronicleCore"; ValueType: string; ValueName: "InstallPath"; ValueData: "{app}"; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\ChronicleCore"; ValueType: string; ValueName: "Version"; ValueData: "{#MyAppVersion}"; Flags: uninsdeletekey
+
 
 
 
