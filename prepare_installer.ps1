@@ -223,8 +223,8 @@ echo.
 REM Wait a moment for services to start
 timeout /t 3 /nobreak >nul
 
-REM Open browser to web UI
-start http://localhost:8080
+REM Open browser to web UI (Force cache bust)
+start http://localhost:8080/?v=$Version
 
 REM Start backend (this blocks and shows logs)
 echo.
@@ -242,7 +242,7 @@ echo ============================================================
 echo.
 
 chroniclecore.exe
-'@
+"@
 $launcherScript | Set-Content (Join-Path $DistDir "ChronicleCore.bat")
 Write-Host "   Launcher created!" -ForegroundColor Green
 Write-Host ""
