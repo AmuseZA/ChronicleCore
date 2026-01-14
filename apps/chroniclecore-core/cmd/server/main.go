@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	AppVersion          = "1.8.3"
+	AppVersion          = "1.8.4"
 	DefaultPort         = "8080"
 	MLPort              = 8081
 	UpdateCheckInterval = 30 * time.Minute
@@ -203,6 +203,8 @@ func main() {
 			blockHandler.ReassignBlock(w, r)
 		} else if strings.HasSuffix(path, "/lock") {
 			blockHandler.LockBlock(w, r)
+		} else if r.Method == http.MethodGet {
+			blockHandler.GetBlock(w, r) // Handle GET /api/v1/blocks/{id}
 		} else if r.Method == http.MethodDelete {
 			blockHandler.DeleteBlock(w, r)
 		} else {

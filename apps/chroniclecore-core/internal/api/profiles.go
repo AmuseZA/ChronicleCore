@@ -48,28 +48,29 @@ type ServiceCreate struct {
 // Rate models
 
 type Rate struct {
-	RateID            int64   `json:"rate_id"`
-	Name              string  `json:"name"`
-	CurrencyCode      string  `json:"currency_code"` // ISO 4217 3-letter code
-	HourlyAmount      float64 `json:"hourly_amount"` // Converted from minor units
-	HourlyMinorUnits  int64   `json:"hourly_minor_units"`
-	EffectiveFrom     *string `json:"effective_from,omitempty"`
-	EffectiveTo       *string `json:"effective_to,omitempty"`
-	IsActive          bool    `json:"is_active"`
+	RateID           int64   `json:"rate_id"`
+	Name             string  `json:"name"`
+	CurrencyCode     string  `json:"currency_code"` // ISO 4217 3-letter code
+	HourlyAmount     float64 `json:"hourly_amount"` // Converted from minor units
+	HourlyMinorUnits int64   `json:"hourly_minor_units"`
+	EffectiveFrom    *string `json:"effective_from,omitempty"`
+	EffectiveTo      *string `json:"effective_to,omitempty"`
+	IsActive         bool    `json:"is_active"`
 }
 
 type RateCreate struct {
-	Name             string  `json:"name"`
-	CurrencyCode     string  `json:"currency_code"` // ISO 4217 3-letter code
-	HourlyAmount     float64 `json:"hourly_amount"` // Will be converted to minor units
-	EffectiveFrom    *string `json:"effective_from,omitempty"`
-	EffectiveTo      *string `json:"effective_to,omitempty"`
+	Name          string  `json:"name"`
+	CurrencyCode  string  `json:"currency_code"` // ISO 4217 3-letter code
+	HourlyAmount  float64 `json:"hourly_amount"` // Will be converted to minor units
+	EffectiveFrom *string `json:"effective_from,omitempty"`
+	EffectiveTo   *string `json:"effective_to,omitempty"`
 }
 
 // Profile models
 
 type Profile struct {
 	ProfileID    int64   `json:"profile_id"`
+	Name         string  `json:"name"` // Added Name field
 	ClientName   string  `json:"client_name"`
 	ProjectName  *string `json:"project_name,omitempty"`
 	ServiceName  string  `json:"service_name"`
@@ -401,6 +402,7 @@ func (h *ProfileHandler) ListProfiles(w http.ResponseWriter, r *http.Request) {
 	query := `
 		SELECT
 			p.profile_id,
+			p.name,
 			c.name as client_name,
 			pr.name as project_name,
 			s.name as service_name,
@@ -432,6 +434,7 @@ func (h *ProfileHandler) ListProfiles(w http.ResponseWriter, r *http.Request) {
 
 		err := rows.Scan(
 			&p.ProfileID,
+			&p.Name,
 			&p.ClientName,
 			&projectName,
 			&p.ServiceName,
@@ -507,6 +510,7 @@ func (h *ProfileHandler) CreateProfile(w http.ResponseWriter, r *http.Request) {
 	err = h.store.GetDB().QueryRow(`
 		SELECT
 			p.profile_id,
+			p.name,
 			c.name,
 			pr.name,
 			s.name,
@@ -522,6 +526,7 @@ func (h *ProfileHandler) CreateProfile(w http.ResponseWriter, r *http.Request) {
 		WHERE p.profile_id = ?
 	`, profileID).Scan(
 		&profile.ProfileID,
+		&profile.Name,
 		&profile.ClientName,
 		&projectName,
 		&profile.ServiceName,
@@ -546,24 +551,24 @@ func (h *ProfileHandler) CreateProfile(w http.ResponseWriter, r *http.Request) {
 
 // ProfileStats contains detailed statistics for a profile
 type ProfileStats struct {
-	ProfileID       int64   `json:"profile_id"`
-	ClientName      string  `json:"client_name"`
-	ProjectName     *string `json:"project_name,omitempty"`
-	ServiceName     string  `json:"service_name"`
-	RateName        string  `json:"rate_name"`
-	RateAmount      float64 `json:"rate_amount"`
-	CurrencyCode    string  `json:"currency_code"`
+	ProfileID    int64   `json:"profile_id"`
+	ClientName   string  `json:"client_name"`
+	ProjectName  *string `json:"project_name,omitempty"`
+	ServiceName  string  `json:"service_name"`
+	RateName     string  `json:"rate_name"`
+	RateAmount   float64 `json:"rate_amount"`
+	CurrencyCode string  `json:"currency_code"`
 
 	// Statistics
-	TotalBlocks          int     `json:"total_blocks"`
-	TotalMinutes         float64 `json:"total_minutes"`
-	TotalHours           float64 `json:"total_hours"`
-	BillableMinutes      float64 `json:"billable_minutes"`
-	BillableHours        float64 `json:"billable_hours"`
-	EstimatedBillable    float64 `json:"estimated_billable"`    // hours * rate
-	LockedMinutes        float64 `json:"locked_minutes"`
-	LockedHours          float64 `json:"locked_hours"`
-	LockedBillable       float64 `json:"locked_billable"`       // locked hours * rate
+	TotalBlocks       int     `json:"total_blocks"`
+	TotalMinutes      float64 `json:"total_minutes"`
+	TotalHours        float64 `json:"total_hours"`
+	BillableMinutes   float64 `json:"billable_minutes"`
+	BillableHours     float64 `json:"billable_hours"`
+	EstimatedBillable float64 `json:"estimated_billable"` // hours * rate
+	LockedMinutes     float64 `json:"locked_minutes"`
+	LockedHours       float64 `json:"locked_hours"`
+	LockedBillable    float64 `json:"locked_billable"` // locked hours * rate
 
 	// Recent blocks for detail view
 	RecentBlocks []ProfileBlock `json:"recent_blocks,omitempty"`

@@ -21,6 +21,150 @@ func NewBlockHandler(store *store.Store) *BlockHandler {
 	return &BlockHandler{store: store}
 }
 
+// GetBlock handles GET /api/v1/blocks/{id}
+func (h *BlockHandler) GetBlock(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract block_id from path
+	pathParts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(pathParts) < 4 {
+		respondError(w, "Invalid path", http.StatusBadRequest)
+		return
+	}
+
+	blockID, err := strconv.ParseInt(pathParts[3], 10, 64)
+	if err != nil {
+		respondError(w, "Invalid block_id", http.StatusBadRequest)
+		return
+	}
+
+	query := `
+		SELECT
+			b.block_id,
+			b.ts_start,
+			b.ts_end,
+			b.confidence,
+			b.billable,
+			b.locked,
+			b.notes,
+			b.description,
+			b.metadata,
+			b.created_at,
+			b.updated_at,
+			b.profile_id,
+			da.app_name as primary_app_name,
+			dd.domain_text as primary_domain,
+			dt.title_text as title_summary,
+			c.name as client_name,
+			pr.name as project_name,
+			s.name as service_name
+		FROM block b
+		JOIN dict_app da ON b.primary_app_id = da.app_id
+		LEFT JOIN dict_domain dd ON b.primary_domain_id = dd.domain_id
+		LEFT JOIN dict_title dt ON b.title_summary_id = dt.title_id
+		LEFT JOIN profile p ON b.profile_id = p.profile_id
+		LEFT JOIN client c ON p.client_id = c.client_id
+		LEFT JOIN project pr ON p.project_id = pr.project_id
+		LEFT JOIN service s ON p.service_id = s.service_id
+		WHERE b.block_id = ?
+	`
+
+	var b BlockDTO
+	var tsStart, tsEnd, createdAt, updatedAt string
+	var profileID sql.NullInt64
+	var primaryDomain, titleSummary, clientName, projectName, serviceName sql.NullString
+	var notes, description, metadata sql.NullString
+
+	err = h.store.GetDB().QueryRow(query, blockID).Scan(
+		&b.BlockID,
+		&tsStart,
+		&tsEnd,
+		&b.Confidence,
+		&b.Billable,
+		&b.Locked,
+		&notes,
+		&description,
+		&metadata,
+		&createdAt,
+		&updatedAt,
+		&profileID,
+		&b.PrimaryAppName,
+		&primaryDomain,
+		&titleSummary,
+		&clientName,
+		&projectName,
+		&serviceName,
+	)
+
+	if err == sql.ErrNoRows {
+		respondError(w, "Block not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		log.Printf("Failed to get block: %v", err)
+		respondError(w, "Failed to get block", http.StatusInternalServerError)
+		return
+	}
+
+	// Parse timestamps
+	start, _ := time.Parse(time.RFC3339, tsStart)
+	end, _ := time.Parse(time.RFC3339, tsEnd)
+
+	// Calculate duration
+	durationSeconds := end.Sub(start).Seconds()
+	b.DurationSeconds = durationSeconds
+	b.DurationMinutes = durationSeconds / 60.0
+	b.DurationHours = durationSeconds / 3600.0
+
+	// Set timestamps
+	b.TsStart = tsStart
+	b.TsEnd = tsEnd
+	b.CreatedAt = createdAt
+	b.UpdatedAt = updatedAt
+
+	// Set nullable fields
+	if profileID.Valid {
+		pid := profileID.Int64
+		b.ProfileID = &pid
+	}
+	if primaryDomain.Valid {
+		b.PrimaryDomain = &primaryDomain.String
+	}
+	if titleSummary.Valid {
+		b.TitleSummary = &titleSummary.String
+	}
+	if clientName.Valid {
+		b.ClientName = &clientName.String
+	}
+	if projectName.Valid {
+		b.ProjectName = &projectName.String
+	}
+	if serviceName.Valid {
+		b.ServiceName = &serviceName.String
+	}
+	if notes.Valid {
+		b.Notes = &notes.String
+	}
+	if description.Valid {
+		b.Description = &description.String
+	}
+
+	// Parse Activity Score from metadata
+	if metadata.Valid {
+		var metaMap map[string]interface{}
+		if err := json.Unmarshal([]byte(metadata.String), &metaMap); err == nil {
+			if score, ok := metaMap["avg_activity_score"].(float64); ok {
+				b.ActivityScore = &score
+			}
+		}
+	}
+
+	respondJSON(w, b, http.StatusOK)
+}
+
 // BlockDTO represents a block with enriched data for API responses
 type BlockDTO struct {
 	BlockID         int64   `json:"block_id"`
