@@ -160,3 +160,4 @@ Root: HKCU; Subkey: "Software\ChronicleCore"; ValueType: string; ValueName: "Ver
 
 
 
+
