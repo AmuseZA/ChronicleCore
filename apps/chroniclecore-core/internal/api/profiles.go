@@ -70,7 +70,7 @@ type RateCreate struct {
 
 type Profile struct {
 	ProfileID    int64   `json:"profile_id"`
-	Name         string  `json:"name"` // Added Name field
+	Name         *string `json:"name,omitempty"` // Changed to pointer to handle NULL
 	ClientName   string  `json:"client_name"`
 	ProjectName  *string `json:"project_name,omitempty"`
 	ServiceName  string  `json:"service_name"`
@@ -429,12 +429,13 @@ func (h *ProfileHandler) ListProfiles(w http.ResponseWriter, r *http.Request) {
 	var profiles []Profile
 	for rows.Next() {
 		var p Profile
+		var profileName sql.NullString
 		var projectName sql.NullString
 		var minorUnits int64
 
 		err := rows.Scan(
 			&p.ProfileID,
-			&p.Name,
+			&profileName,
 			&p.ClientName,
 			&projectName,
 			&p.ServiceName,
@@ -448,6 +449,9 @@ func (h *ProfileHandler) ListProfiles(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		if profileName.Valid {
+			p.Name = &profileName.String
+		}
 		if projectName.Valid {
 			p.ProjectName = &projectName.String
 		}
@@ -504,6 +508,7 @@ func (h *ProfileHandler) CreateProfile(w http.ResponseWriter, r *http.Request) {
 
 	// Fetch created profile with joins
 	var profile Profile
+	var profileName sql.NullString
 	var projectName sql.NullString
 	var minorUnits int64
 
@@ -526,7 +531,7 @@ func (h *ProfileHandler) CreateProfile(w http.ResponseWriter, r *http.Request) {
 		WHERE p.profile_id = ?
 	`, profileID).Scan(
 		&profile.ProfileID,
-		&profile.Name,
+		&profileName,
 		&profile.ClientName,
 		&projectName,
 		&profile.ServiceName,
@@ -541,6 +546,9 @@ func (h *ProfileHandler) CreateProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if profileName.Valid {
+		profile.Name = &profileName.String
+	}
 	if projectName.Valid {
 		profile.ProjectName = &projectName.String
 	}

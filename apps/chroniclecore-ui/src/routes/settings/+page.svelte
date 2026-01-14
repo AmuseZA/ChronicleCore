@@ -29,7 +29,7 @@
                 <div class="block text-sm font-medium text-slate-700">
                     Version
                 </div>
-                <div class="mt-1 text-sm text-slate-900">v1.8.9</div>
+                <div class="mt-1 text-sm text-slate-900">v1.8.10</div>
             </div>
             <div>
                 <div class="block text-sm font-medium text-slate-700">
