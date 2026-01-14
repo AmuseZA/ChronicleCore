@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	AppVersion          = "1.8.1"
+	AppVersion          = "1.8.2"
 	DefaultPort         = "8080"
 	MLPort              = 8081
 	UpdateCheckInterval = 30 * time.Minute
@@ -135,6 +135,15 @@ func main() {
 	spaHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 
+		// Force no-cache for root and index.html to prevent stale UI
+		if path == "/" || path == "/index.html" {
+			w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+			w.Header().Set("Pragma", "no-cache")
+			w.Header().Set("Expires", "0")
+			http.ServeFile(w, r, filepath.Join(webDir, "index.html"))
+			return
+		}
+
 		// API routes are handled by specific handlers registered below.
 		// If we get here, it means no specific API route matched yet
 		// (wait, ServeMux matches longest pattern, so we need to be careful).
@@ -145,6 +154,12 @@ func main() {
 		cleanPath := filepath.Clean(path)
 		fullPath := filepath.Join(webDir, cleanPath)
 
+		// Prevent directory traversal attacks
+		if !strings.HasPrefix(fullPath, webDir) {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+
 		if fileExists(fullPath) {
 			// Serve static file
 			fileServer.ServeHTTP(w, r)
@@ -153,6 +168,9 @@ func main() {
 
 		// If not found and not an API call, serve index.html (SPA Fallback)
 		if !strings.HasPrefix(path, "/api/") {
+			w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+			w.Header().Set("Pragma", "no-cache")
+			w.Header().Set("Expires", "0")
 			http.ServeFile(w, r, filepath.Join(webDir, "index.html"))
 			return
 		}
