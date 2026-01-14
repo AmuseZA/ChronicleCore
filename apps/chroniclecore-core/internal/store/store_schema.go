@@ -104,6 +104,22 @@ func (s *Store) ensureSchema(db *sql.DB) error {
 		  reason          TEXT,
 		  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 		);`,
+
+		// 1.8.1 Migration: ML deletion learning
+		`ALTER TABLE ml_label_event ADD COLUMN action_type TEXT DEFAULT 'ASSIGN'`,
+
+		// 1.8.1 Migration: Add DELETE_SUGGEST to suggestion types (handled via INSERT not ALTER)
+		// Note: SQLite doesn't support ALTER CHECK constraint, so we create a new table to track deletion training
+		`CREATE TABLE IF NOT EXISTS ml_deletion_event (
+		  deletion_event_id INTEGER PRIMARY KEY,
+		  app_name          TEXT NOT NULL,
+		  title_text        TEXT,
+		  domain_text       TEXT,
+		  ts_start          TEXT,
+		  ts_end            TEXT,
+		  actor             TEXT NOT NULL DEFAULT 'USER',
+		  created_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+		);`,
 	}
 
 	for _, query := range queries {

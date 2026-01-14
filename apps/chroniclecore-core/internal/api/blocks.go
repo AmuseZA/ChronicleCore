@@ -378,13 +378,17 @@ func (h *BlockHandler) ListGroupedBlocks(w http.ResponseWriter, r *http.Request)
 		LEFT JOIN app_blacklist abl ON b.primary_app_id = abl.app_id
 		LEFT JOIN ml_suggestion ms ON b.block_id = ms.entity_id AND ms.entity_type = 'BLOCK' AND ms.status = 'PENDING'
 		WHERE abl.app_id IS NULL
+		  AND NOT EXISTS (
+			  SELECT 1 FROM keyword_blacklist kbl 
+			  WHERE dt.title_text LIKE '%' || kbl.keyword_text || '%'
+		  )
 	`
 
 	var args []interface{}
 
-	// Apply needs_review filter
+	// Apply needs_review filter - includes blocks with pending ML suggestions
 	if needsReview {
-		query += " AND (b.profile_id IS NULL OR b.confidence = 'LOW')"
+		query += " AND (b.profile_id IS NULL OR b.confidence = 'LOW' OR ms.status = 'PENDING')"
 	}
 
 	// Apply date filter
@@ -895,6 +899,9 @@ func (h *BlockHandler) DeleteBlock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Record block features before deletion for ML training
+	h.recordDeletionForML(id)
+
 	if err := h.store.DeleteBlock(id); err != nil {
 		log.Printf("API DeleteBlock failed: %v", err)
 		http.Error(w, "Failed to delete block", http.StatusInternalServerError)
@@ -902,6 +909,39 @@ func (h *BlockHandler) DeleteBlock(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSON(w, map[string]bool{"success": true}, http.StatusOK)
+}
+
+// recordDeletionForML saves block features to ml_deletion_event for learning
+func (h *BlockHandler) recordDeletionForML(blockID int64) {
+	// Fetch block features before deletion
+	var appName string
+	var titleText, domainText, tsStart, tsEnd sql.NullString
+
+	err := h.store.GetDB().QueryRow(`
+		SELECT da.app_name, dt.title_text, dd.domain_text, b.ts_start, b.ts_end
+		FROM block b
+		JOIN dict_app da ON b.primary_app_id = da.app_id
+		LEFT JOIN dict_title dt ON b.title_summary_id = dt.title_id
+		LEFT JOIN dict_domain dd ON b.primary_domain_id = dd.domain_id
+		WHERE b.block_id = ?
+	`, blockID).Scan(&appName, &titleText, &domainText, &tsStart, &tsEnd)
+
+	if err != nil {
+		log.Printf("Could not fetch block %d for ML deletion learning: %v", blockID, err)
+		return
+	}
+
+	// Insert into ml_deletion_event
+	_, err = h.store.GetDB().Exec(`
+		INSERT INTO ml_deletion_event (app_name, title_text, domain_text, ts_start, ts_end, actor)
+		VALUES (?, ?, ?, ?, ?, 'USER')
+	`, appName, titleText, domainText, tsStart, tsEnd)
+
+	if err != nil {
+		log.Printf("Failed to record deletion for ML: %v", err)
+	} else {
+		log.Printf("Recorded deletion of block %d (%s) for ML learning", blockID, appName)
+	}
 }
 
 // getBlocksByIDs fetches blocks by IDs (helper for returning updated blocks)

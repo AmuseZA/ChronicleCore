@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	AppVersion          = "1.8.0"
+	AppVersion          = "1.8.1"
 	DefaultPort         = "8080"
 	MLPort              = 8081
 	UpdateCheckInterval = 30 * time.Minute
@@ -281,8 +281,10 @@ func main() {
 		mux.HandleFunc("/api/v1/ml/training-data", mlHandler.GetTrainingData)
 		mux.HandleFunc("/api/v1/ml/train", mlHandler.TriggerTraining)
 		mux.HandleFunc("/api/v1/ml/predict", mlHandler.PredictBlocks)
+		mux.HandleFunc("/api/v1/ml/predict-deletions", mlHandler.PredictDeletions)
 		mux.HandleFunc("/api/v1/ml/suggestions", mlHandler.GetSuggestions)
 		mux.HandleFunc("/api/v1/ml/suggestions/accept", mlHandler.AcceptSuggestion)
+		mux.HandleFunc("/api/v1/ml/suggestions/reject", mlHandler.RejectSuggestion)
 		log.Println("✓ ML endpoints registered")
 	}
 
@@ -536,6 +538,21 @@ func handleTrackingStop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Trigger ML predictions in background if sidecar is available
+	if mlSidecar != nil && mlSidecar.IsRunning() {
+		go func() {
+			log.Println("Session stopped - auto-triggering ML predictions...")
+			// Small delay to let any pending blocks finalize
+			time.Sleep(500 * time.Millisecond)
+
+			if err := triggerMLPredictions(); err != nil {
+				log.Printf("Auto-prediction after session stop failed: %v", err)
+			} else {
+				log.Println("Auto-prediction after session stop completed")
+			}
+		}()
+	}
+
 	handleTrackingStatus(w, &http.Request{Method: "GET"})
 }
 
@@ -592,4 +609,77 @@ func checkForUpdateBackground() {
 	if latestVersion != AppVersion && latestVersion > AppVersion {
 		log.Printf("🔔 Update available: v%s -> v%s (check Settings to download)", AppVersion, latestVersion)
 	}
+}
+
+// triggerMLPredictions calls the ML sidecar to generate predictions for unassigned blocks
+func triggerMLPredictions() error {
+	if mlSidecar == nil || !mlSidecar.IsRunning() {
+		return fmt.Errorf("ML sidecar not available")
+	}
+
+	// Check if model is trained by hitting status endpoint
+	client := &http.Client{Timeout: 30 * time.Second}
+	statusURL := fmt.Sprintf("http://127.0.0.1:%d/status", mlSidecar.GetPort())
+
+	req, err := http.NewRequest("GET", statusURL, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create status request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+mlSidecar.GetToken())
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("status check failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var status struct {
+		Ready       bool `json:"ready"`
+		ModelLoaded bool `json:"model_loaded"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
+		return fmt.Errorf("failed to decode status: %w", err)
+	}
+
+	if !status.ModelLoaded {
+		log.Println("ML model not loaded, skipping profile prediction")
+		// Still try deletion predictions even without trained model
+	} else {
+		// Trigger profile prediction via internal HTTP call
+		predictURL := fmt.Sprintf("http://127.0.0.1:%s/api/v1/ml/predict", DefaultPort)
+		req, err = http.NewRequest("POST", predictURL, nil)
+		if err != nil {
+			log.Printf("Failed to create predict request: %v", err)
+		} else {
+			resp, err = client.Do(req)
+			if err != nil {
+				log.Printf("Predict request failed: %v", err)
+			} else {
+				var result map[string]interface{}
+				json.NewDecoder(resp.Body).Decode(&result)
+				resp.Body.Close()
+				log.Printf("Auto profile prediction result: %v", result)
+			}
+		}
+	}
+
+	// Also trigger deletion predictions (based on learned patterns, no model needed)
+	deletePredictURL := fmt.Sprintf("http://127.0.0.1:%s/api/v1/ml/predict-deletions", DefaultPort)
+	req, err = http.NewRequest("POST", deletePredictURL, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create delete predict request: %w", err)
+	}
+
+	resp, err = client.Do(req)
+	if err != nil {
+		log.Printf("Deletion predict request failed: %v", err)
+	} else {
+		var deleteResult map[string]interface{}
+		json.NewDecoder(resp.Body).Decode(&deleteResult)
+		resp.Body.Close()
+		log.Printf("Auto deletion prediction result: %v", deleteResult)
+	}
+
+	return nil
 }

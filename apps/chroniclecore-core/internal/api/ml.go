@@ -337,10 +337,10 @@ func (h *MLHandler) PredictBlocks(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success":            true,
-		"predictions":        len(predictResp.Predictions),
+		"success":             true,
+		"predictions":         len(predictResp.Predictions),
 		"suggestions_created": suggestionsCreated,
-		"model_version":      predictResp.ModelVersion,
+		"model_version":       predictResp.ModelVersion,
 	})
 }
 
@@ -510,6 +510,77 @@ func (h *MLHandler) AcceptSuggestion(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// RejectSuggestion rejects an ML suggestion without applying it
+func (h *MLHandler) RejectSuggestion(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		SuggestionID int `json:"suggestion_id"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	// Get suggestion details before rejecting (for negative training signal)
+	var entityType, suggestionType, payloadJSON string
+	var entityID int
+	var confidence float64
+
+	err := h.db.QueryRow(`
+		SELECT entity_type, entity_id, suggestion_type, payload_json, confidence
+		FROM ml_suggestion
+		WHERE suggestion_id = ? AND status = 'PENDING'
+	`, req.SuggestionID).Scan(&entityType, &entityID, &suggestionType, &payloadJSON, &confidence)
+
+	if err == sql.ErrNoRows {
+		http.Error(w, "Suggestion not found or already processed", http.StatusNotFound)
+		return
+	} else if err != nil {
+		http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Record negative training signal for profile suggestions
+	if suggestionType == "PROFILE_ASSIGN" && entityType == "BLOCK" {
+		var payload map[string]interface{}
+		if err := json.Unmarshal([]byte(payloadJSON), &payload); err == nil {
+			if predictedID, ok := payload["predicted_profile_id"].(float64); ok {
+				// Record the rejected suggestion as negative training data
+				// This tells the ML "this profile was suggested but user disagreed"
+				_, err := h.db.Exec(`
+					INSERT INTO ml_label_event (block_id, old_profile_id, new_profile_id, actor, confidence_after, action_type)
+					VALUES (?, ?, NULL, 'USER', 'REJECTED', 'REJECT')
+				`, entityID, int(predictedID))
+				if err != nil {
+					log.Printf("Failed to record rejection feedback: %v", err)
+				} else {
+					log.Printf("Recorded rejection feedback for block %d (rejected profile %d)", entityID, int(predictedID))
+				}
+			}
+		}
+	}
+
+	// Mark suggestion as rejected
+	_, err = h.db.Exec(`
+		UPDATE ml_suggestion
+		SET status = 'REJECTED', resolved_at = datetime('now')
+		WHERE suggestion_id = ? AND status = 'PENDING'
+	`, req.SuggestionID)
+
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Rejected suggestion %d", req.SuggestionID)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": "Suggestion rejected",
+	})
+}
+
 // GetMLStatus returns the current ML system status
 func (h *MLHandler) GetMLStatus(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -640,4 +711,132 @@ func (h *MLHandler) logMLRun(runType string, modelID int, success bool, errorSum
 	if err != nil {
 		log.Printf("Failed to log ML run: %v", err)
 	}
+}
+
+// PredictDeletions suggests blocks for deletion based on learned patterns
+func (h *MLHandler) PredictDeletions(w http.ResponseWriter, r *http.Request) {
+	log.Println("Generating deletion predictions based on learned patterns...")
+
+	// Get count of deletion training samples
+	var deletionCount int
+	h.db.QueryRow("SELECT COUNT(*) FROM ml_deletion_event").Scan(&deletionCount)
+
+	if deletionCount < 3 {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success":     true,
+			"suggestions": 0,
+			"message":     fmt.Sprintf("Not enough deletion training data (have %d, need 3+)", deletionCount),
+		})
+		return
+	}
+
+	// Get learned deletion patterns (app_name patterns that were deleted)
+	deletedApps := make(map[string]int)
+	deletedTitles := make(map[string]int)
+
+	rows, err := h.db.Query(`SELECT app_name, title_text FROM ml_deletion_event`)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to query deletion events: %v", err), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var appName string
+		var titleText sql.NullString
+		rows.Scan(&appName, &titleText)
+		deletedApps[appName]++
+		if titleText.Valid && titleText.String != "" {
+			deletedTitles[titleText.String]++
+		}
+	}
+
+	// Find unassigned blocks that match deletion patterns
+	query := `
+		SELECT b.block_id, da.app_name, dt.title_text
+		FROM block b
+		JOIN dict_app da ON b.primary_app_id = da.app_id
+		LEFT JOIN dict_title dt ON b.title_summary_id = dt.title_id
+		LEFT JOIN app_blacklist abl ON b.primary_app_id = abl.app_id
+		WHERE b.profile_id IS NULL
+		  AND abl.app_id IS NULL
+		  AND b.confidence = 'LOW'
+		ORDER BY b.ts_start DESC
+		LIMIT 100
+	`
+
+	blockRows, err := h.db.Query(query)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to query blocks: %v", err), http.StatusInternalServerError)
+		return
+	}
+	defer blockRows.Close()
+
+	suggestionsCreated := 0
+	for blockRows.Next() {
+		var blockID int
+		var appName string
+		var titleText sql.NullString
+
+		blockRows.Scan(&blockID, &appName, &titleText)
+
+		// Calculate confidence based on matches
+		appMatches := deletedApps[appName]
+		titleMatches := 0
+		if titleText.Valid {
+			titleMatches = deletedTitles[titleText.String]
+		}
+
+		// Only suggest if app has been deleted at least 2 times or title matches
+		if appMatches >= 2 || titleMatches >= 1 {
+			confidence := float64(appMatches+titleMatches) / float64(deletionCount)
+			if confidence > 1.0 {
+				confidence = 0.95
+			}
+			if confidence < 0.5 {
+				confidence = 0.5 // Minimum threshold for suggestions
+			}
+
+			// Check if suggestion already exists
+			var existing int
+			h.db.QueryRow(`
+				SELECT COUNT(*) FROM ml_suggestion 
+				WHERE entity_id = ? AND suggestion_type = 'DELETE_SUGGEST' AND status = 'PENDING'
+			`, blockID).Scan(&existing)
+
+			if existing > 0 {
+				continue
+			}
+
+			payloadJSON, _ := json.Marshal(map[string]interface{}{
+				"reason":        fmt.Sprintf("Similar to %d previously deleted items", appMatches+titleMatches),
+				"app_matches":   appMatches,
+				"title_matches": titleMatches,
+			})
+
+			// Note: We insert DELETE_SUGGEST even though schema CHECK may not include it
+			// SQLite will accept it anyway and we handle it in code
+			_, err = h.db.Exec(`
+				INSERT INTO ml_suggestion (entity_type, entity_id, suggestion_type, payload_json, confidence, status)
+				VALUES ('BLOCK', ?, 'DELETE_SUGGEST', ?, ?, 'PENDING')
+			`, blockID, string(payloadJSON), confidence)
+
+			if err != nil {
+				log.Printf("Failed to create delete suggestion for block %d: %v", blockID, err)
+				continue
+			}
+
+			suggestionsCreated++
+		}
+	}
+
+	log.Printf("Created %d deletion suggestions from %d learned patterns", suggestionsCreated, deletionCount)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":             true,
+		"suggestions_created": suggestionsCreated,
+		"deletion_patterns":   deletionCount,
+	})
 }

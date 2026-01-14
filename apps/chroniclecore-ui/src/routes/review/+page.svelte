@@ -65,6 +65,15 @@
     let isTraining = false;
     let trainingMessage = "";
 
+    // Settings
+    let skipDeleteConfirmation = false;
+
+    // Load settings from localStorage
+    function loadSettings() {
+        skipDeleteConfirmation =
+            localStorage.getItem("skipDeleteConfirmation") === "true";
+    }
+
     // Separate groups by confidence
     $: unassignedGroups = groups.filter((g) =>
         g.blocks.every((b) => !b.profile_id),
@@ -172,14 +181,47 @@
     }
 
     async function deleteBlock(blockId: number) {
-        if (!confirm("Are you sure you want to delete this block?")) return;
+        if (
+            !skipDeleteConfirmation &&
+            !confirm("Are you sure you want to delete this block?")
+        )
+            return;
+        const scrollY = window.scrollY;
         processingId = blockId;
         try {
             await fetchApi(`/blocks/${blockId}`, { method: "DELETE" });
             await loadData(pagination.page);
+            // Restore scroll position after DOM update
+            requestAnimationFrame(() => window.scrollTo(0, scrollY));
         } catch (e) {
             console.error(e);
             alert("Failed to delete block");
+        } finally {
+            processingId = null;
+        }
+    }
+
+    async function deleteGroup(group: GroupedBlock) {
+        if (
+            !skipDeleteConfirmation &&
+            !confirm(
+                `Are you sure you want to delete all ${group.block_count} items in this group?`,
+            )
+        )
+            return;
+        const scrollY = window.scrollY;
+        processingId = group.blocks[0]?.block_id || null;
+        try {
+            for (const block of group.blocks) {
+                await fetchApi(`/blocks/${block.block_id}`, {
+                    method: "DELETE",
+                });
+            }
+            await loadData(pagination.page);
+            requestAnimationFrame(() => window.scrollTo(0, scrollY));
+        } catch (e) {
+            console.error(e);
+            alert("Failed to delete group");
         } finally {
             processingId = null;
         }
@@ -281,7 +323,10 @@
         return pages;
     })();
 
-    onMount(() => loadData());
+    onMount(() => {
+        loadSettings();
+        loadData();
+    });
 </script>
 
 <div class="max-w-7xl mx-auto space-y-6 pb-20">
@@ -295,6 +340,13 @@
             </p>
         </div>
         <div class="flex items-center gap-3">
+            <!-- Add Entry Link -->
+            <a
+                href="/history"
+                class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+            >
+                + Add Entry
+            </a>
             <!-- ML Status & Training -->
             {#if mlStatus}
                 <div
@@ -554,6 +606,12 @@
                                         {/if}
                                     </button>
                                     <div class="flex gap-3">
+                                        <button
+                                            on:click={() => deleteGroup(group)}
+                                            class="text-xs text-slate-400 hover:text-red-600 hover:underline"
+                                        >
+                                            Delete Group
+                                        </button>
                                         <button
                                             on:click={() =>
                                                 openBlacklistModal(

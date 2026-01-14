@@ -1,6 +1,6 @@
 # ChronicleCore Product Roadmap
 
-**Current Version:** 1.8.0  
+**Current Version:** 1.8.1  
 **Last Updated:** January 2026
 
 ---

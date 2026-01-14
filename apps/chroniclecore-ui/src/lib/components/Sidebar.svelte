@@ -198,6 +198,40 @@
             {/if}
         </a>
 
+        <a
+            href="/suggestions"
+            class="group flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-all duration-200
+           {$page.url.pathname === '/suggestions'
+                ? 'bg-purple-50 text-purple-700 shadow-sm ring-1 ring-purple-100'
+                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
+           {$ui.isSidebarCollapsed ? 'justify-center' : ''}"
+            title="ML Suggestions"
+        >
+            <div
+                class="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center transition-colors
+                {$page.url.pathname === '/suggestions'
+                    ? 'bg-purple-100 text-purple-600'
+                    : 'bg-slate-100 text-slate-500 group-hover:bg-white group-hover:shadow-sm'}"
+            >
+                <svg
+                    class="w-5 h-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                >
+                    <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M13 10V3L4 14h7v7l9-11h-7z"
+                    />
+                </svg>
+            </div>
+            {#if !$ui.isSidebarCollapsed}
+                <span class="whitespace-nowrap">ML Suggestions</span>
+            {/if}
+        </a>
+
         {#if !$ui.isSidebarCollapsed}
             <div
                 class="mt-8 px-4 mb-2 text-xs font-bold text-slate-400 uppercase tracking-wider"

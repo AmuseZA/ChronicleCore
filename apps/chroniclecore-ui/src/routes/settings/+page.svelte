@@ -1,5 +1,20 @@
 <script lang="ts">
-    // Basic settings placeholder
+    import { onMount } from "svelte";
+
+    let skipDeleteConfirmation = false;
+
+    onMount(() => {
+        skipDeleteConfirmation =
+            localStorage.getItem("skipDeleteConfirmation") === "true";
+    });
+
+    function toggleDeleteConfirmation() {
+        skipDeleteConfirmation = !skipDeleteConfirmation;
+        localStorage.setItem(
+            "skipDeleteConfirmation",
+            skipDeleteConfirmation.toString(),
+        );
+    }
 </script>
 
 <div class="max-w-4xl mx-auto space-y-6">
@@ -14,7 +29,7 @@
                 <div class="block text-sm font-medium text-slate-700">
                     Version
                 </div>
-                <div class="mt-1 text-sm text-slate-900">v1.8.0</div>
+                <div class="mt-1 text-sm text-slate-900">v1.8.1</div>
             </div>
             <div>
                 <div class="block text-sm font-medium text-slate-700">
@@ -117,6 +132,39 @@
                 >
                     Manage Blacklist
                 </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+        <h2 class="text-lg font-semibold text-slate-900 mb-4">
+            User Preferences
+        </h2>
+        <div class="space-y-4">
+            <div
+                class="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-100"
+            >
+                <div>
+                    <h3 class="font-medium text-slate-900">
+                        Skip Delete Confirmations
+                    </h3>
+                    <p class="text-sm text-slate-500">
+                        Remove confirmation dialogs when deleting items or
+                        groups.
+                    </p>
+                </div>
+                <button
+                    on:click={toggleDeleteConfirmation}
+                    class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 {skipDeleteConfirmation
+                        ? 'bg-blue-600'
+                        : 'bg-slate-300'}"
+                >
+                    <span
+                        class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {skipDeleteConfirmation
+                            ? 'translate-x-6'
+                            : 'translate-x-1'}"
+                    ></span>
+                </button>
             </div>
         </div>
     </div>

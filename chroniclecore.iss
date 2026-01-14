@@ -2,7 +2,7 @@
 ; Creates a single-EXE installer with everything embedded
 
 #define MyAppName "ChronicleCore"
-#define MyAppVersion "1.8.0"
+#define MyAppVersion "1.8.1"
 #define MyAppPublisher "ChronicleCore"
 #define MyAppExeName "ChronicleCore.bat"
 #define MyAppURL "https://github.com/yourusername/chroniclecore"
@@ -137,6 +137,9 @@ Type: filesandordirs; Name: "{app}"
 ; Store installation info for updates
 Root: HKCU; Subkey: "Software\ChronicleCore"; ValueType: string; ValueName: "InstallPath"; ValueData: "{app}"; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\ChronicleCore"; ValueType: string; ValueName: "Version"; ValueData: "{#MyAppVersion}"; Flags: uninsdeletekey
+
+
+
 
 
 
