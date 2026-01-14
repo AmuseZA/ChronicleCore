@@ -202,8 +202,12 @@ func (h *BlacklistHandler) RemoveFromBlacklist(w http.ResponseWriter, r *http.Re
 	respondJSON(w, map[string]bool{"success": true}, http.StatusOK)
 }
 
-// BlacklistAndDeleteBlocks blacklists an app AND deletes all associated blocks
+// BlacklistAndHideBlocks blacklists an app (soft delete - just hides from view)
 func (h *BlacklistHandler) BlacklistAndDeleteBlocks(w http.ResponseWriter, r *http.Request) {
+	// Renamed logic but kept endpoint name for compatibility if needed, or better, we change logic.
+	// Actually, let's keep the name "BlacklistAndDeleteBlocks" in the handler for now to avoid breaking router if I didn't update main.go router (I didn't).
+	// BUT, we will CHANGE THE BEHAVIOR to NOT delete.
+
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -216,14 +220,17 @@ func (h *BlacklistHandler) BlacklistAndDeleteBlocks(w http.ResponseWriter, r *ht
 	}
 
 	var appID int64
+	var appName string
 
 	// Get app_id
 	if input.AppID != nil {
 		appID = *input.AppID
+		h.store.GetDB().QueryRow("SELECT app_name FROM dict_app WHERE app_id = ?", appID).Scan(&appName)
 	} else if strings.TrimSpace(input.AppName) != "" {
+		appName = strings.TrimSpace(input.AppName)
 		err := h.store.GetDB().QueryRow(
 			"SELECT app_id FROM dict_app WHERE app_name = ?",
-			strings.TrimSpace(input.AppName),
+			appName,
 		).Scan(&appID)
 		if err == sql.ErrNoRows {
 			respondError(w, "App not found", http.StatusNotFound)
@@ -238,16 +245,8 @@ func (h *BlacklistHandler) BlacklistAndDeleteBlocks(w http.ResponseWriter, r *ht
 		return
 	}
 
-	// Start transaction
-	tx, err := h.store.GetDB().Begin()
-	if err != nil {
-		respondError(w, "Failed to start transaction", http.StatusInternalServerError)
-		return
-	}
-	defer tx.Rollback()
-
-	// 1. Add to blacklist (ignore if already exists)
-	_, err = tx.Exec(
+	// Insert into blacklist (ignore if already exists)
+	_, err := h.store.GetDB().Exec(
 		"INSERT OR IGNORE INTO app_blacklist (app_id, reason) VALUES (?, ?)",
 		appID,
 		input.Reason,
@@ -258,48 +257,141 @@ func (h *BlacklistHandler) BlacklistAndDeleteBlocks(w http.ResponseWriter, r *ht
 		return
 	}
 
-	// 2. Delete all blocks with this app
-	result, err := tx.Exec(
-		"DELETE FROM block WHERE primary_app_id = ?",
-		appID,
-	)
-	if err != nil {
-		log.Printf("Failed to delete blocks: %v", err)
-		respondError(w, "Failed to delete blocks", http.StatusInternalServerError)
-		return
-	}
-
-	blocksDeleted, _ := result.RowsAffected()
-
-	// 3. Delete raw events with this app
-	result, err = tx.Exec(
-		"DELETE FROM raw_event WHERE app_id = ?",
-		appID,
-	)
-	if err != nil {
-		log.Printf("Failed to delete raw events: %v", err)
-		respondError(w, "Failed to delete raw events", http.StatusInternalServerError)
-		return
-	}
-
-	eventsDeleted, _ := result.RowsAffected()
-
-	// Commit transaction
-	if err = tx.Commit(); err != nil {
-		respondError(w, "Failed to commit transaction", http.StatusInternalServerError)
-		return
-	}
-
-	// Get app name for response
-	var appName string
-	h.store.GetDB().QueryRow("SELECT app_name FROM dict_app WHERE app_id = ?", appID).Scan(&appName)
+	// We NO LONGER delete blocks or raw events.
+	// We just return success.
 
 	respondJSON(w, map[string]interface{}{
 		"success":        true,
 		"app_name":       appName,
-		"blocks_deleted": blocksDeleted,
-		"events_deleted": eventsDeleted,
+		"message":        "App blacklisted and hidden from view (data preserved)",
+		"blocks_deleted": 0,
+		"events_deleted": 0,
 	}, http.StatusOK)
+}
+
+// AddToKeywordBlacklist adds a keyword string to the blacklist
+func (h *BlacklistHandler) AddToKeywordBlacklist(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Keyword string  `json:"keyword"`
+		Reason  *string `json:"reason"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if strings.TrimSpace(req.Keyword) == "" {
+		respondError(w, "Keyword required", http.StatusBadRequest)
+		return
+	}
+
+	_, err := h.store.GetDB().Exec(
+		"INSERT OR IGNORE INTO keyword_blacklist (keyword_text, reason) VALUES (?, ?)",
+		strings.TrimSpace(req.Keyword),
+		req.Reason,
+	)
+	if err != nil {
+		log.Printf("Failed to add keyword: %v", err)
+		respondError(w, "Failed to add keyword blacklist", http.StatusInternalServerError)
+		return
+	}
+
+	respondJSON(w, map[string]interface{}{"success": true}, http.StatusOK)
+}
+
+// KeywordBlacklistEntry represents a blacklisted keyword
+type KeywordBlacklistEntry struct {
+	KeywordID   int64   `json:"keyword_id"`
+	KeywordText string  `json:"keyword_text"`
+	Reason      *string `json:"reason,omitempty"`
+	CreatedAt   string  `json:"created_at"`
+}
+
+// ListKeywordBlacklist returns all blacklisted keywords
+func (h *BlacklistHandler) ListKeywordBlacklist(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	query := `
+		SELECT keyword_id, keyword_text, reason, created_at
+		FROM keyword_blacklist
+		ORDER BY keyword_text ASC
+	`
+
+	rows, err := h.store.GetDB().Query(query)
+	if err != nil {
+		log.Printf("Failed to query keyword blacklist: %v", err)
+		respondError(w, "Failed to query keyword blacklist", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var entries []KeywordBlacklistEntry
+	for rows.Next() {
+		var e KeywordBlacklistEntry
+		var reason sql.NullString
+		err := rows.Scan(&e.KeywordID, &e.KeywordText, &reason, &e.CreatedAt)
+		if err != nil {
+			log.Printf("Failed to scan keyword blacklist entry: %v", err)
+			continue
+		}
+		if reason.Valid {
+			e.Reason = &reason.String
+		}
+		entries = append(entries, e)
+	}
+
+	if entries == nil {
+		entries = []KeywordBlacklistEntry{}
+	}
+
+	respondJSON(w, entries, http.StatusOK)
+}
+
+// RemoveFromKeywordBlacklist removes a keyword from the blacklist
+func (h *BlacklistHandler) RemoveFromKeywordBlacklist(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract keyword_id from path: /api/v1/blacklist/keywords/{id}
+	pathParts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(pathParts) < 5 {
+		respondError(w, "Invalid path", http.StatusBadRequest)
+		return
+	}
+
+	keywordID, err := strconv.ParseInt(pathParts[4], 10, 64)
+	if err != nil {
+		respondError(w, "Invalid keyword_id", http.StatusBadRequest)
+		return
+	}
+
+	result, err := h.store.GetDB().Exec(
+		"DELETE FROM keyword_blacklist WHERE keyword_id = ?",
+		keywordID,
+	)
+	if err != nil {
+		log.Printf("Failed to remove keyword from blacklist: %v", err)
+		respondError(w, "Failed to remove keyword from blacklist", http.StatusInternalServerError)
+		return
+	}
+
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		respondError(w, "Keyword not found", http.StatusNotFound)
+		return
+	}
+
+	respondJSON(w, map[string]bool{"success": true}, http.StatusOK)
 }
 
 // IsBlacklisted checks if an app is blacklisted (used internally)

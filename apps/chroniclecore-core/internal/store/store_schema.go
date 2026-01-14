@@ -11,10 +11,10 @@ func (s *Store) ensureSchema(db *sql.DB) error {
 	queries := []string{
 		// 1.5.0 Migration: Add 'metadata' to block if missing
 		`ALTER TABLE block ADD COLUMN metadata TEXT`,
-		
+
 		// 1.5.0 Migration: Add 'metadata' to raw_event if missing
 		`ALTER TABLE raw_event ADD COLUMN metadata TEXT`,
-		
+
 		// 1.5.0 New Tables (ML Pipeline)
 		// Model Registry
 		`CREATE TABLE IF NOT EXISTS ml_model_registry (
@@ -28,7 +28,7 @@ func (s *Store) ensureSchema(db *sql.DB) error {
 		  trained_samples   INTEGER NOT NULL DEFAULT 0,
 		  created_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 		);`,
-		
+
 		// Label Events
 		`CREATE TABLE IF NOT EXISTS ml_label_event (
 		  label_event_id    INTEGER PRIMARY KEY,
@@ -96,6 +96,14 @@ func (s *Store) ensureSchema(db *sql.DB) error {
 
 		// 1.7.0 Index for manual entries
 		`CREATE INDEX IF NOT EXISTS idx_block_is_manual ON block (is_manual);`,
+
+		// 1.8.0 Migration: Keyword Blacklist
+		`CREATE TABLE IF NOT EXISTS keyword_blacklist (
+		  keyword_id      INTEGER PRIMARY KEY,
+		  keyword_text    TEXT NOT NULL UNIQUE,
+		  reason          TEXT,
+		  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+		);`,
 	}
 
 	for _, query := range queries {

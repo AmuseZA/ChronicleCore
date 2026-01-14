@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	AppVersion          = "1.7.5"
+	AppVersion          = "1.8.0"
 	DefaultPort         = "8080"
 	MLPort              = 8081
 	UpdateCheckInterval = 30 * time.Minute
@@ -262,6 +262,18 @@ func main() {
 	})
 	mux.HandleFunc("/api/v1/blacklist/", blacklistHandler.RemoveFromBlacklist)
 	mux.HandleFunc("/api/v1/blacklist/with-delete", blacklistHandler.BlacklistAndDeleteBlocks)
+
+	// Keyword blacklist endpoints
+	mux.HandleFunc("/api/v1/blacklist/keywords", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			blacklistHandler.ListKeywordBlacklist(w, r)
+		} else if r.Method == http.MethodPost {
+			blacklistHandler.AddToKeywordBlacklist(w, r)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/v1/blacklist/keywords/", blacklistHandler.RemoveFromKeywordBlacklist)
 
 	// ML endpoints (only if sidecar is available)
 	if mlHandler != nil {

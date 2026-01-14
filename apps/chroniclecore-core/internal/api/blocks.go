@@ -364,7 +364,9 @@ func (h *BlockHandler) ListGroupedBlocks(w http.ResponseWriter, r *http.Request)
 			dt.title_text as title_summary,
 			c.name as client_name,
 			pr.name as project_name,
-			s.name as service_name
+			s.name as service_name,
+			ms.payload_json,
+			ms.confidence as ml_confidence
 		FROM block b
 		JOIN dict_app da ON b.primary_app_id = da.app_id
 		LEFT JOIN dict_domain dd ON b.primary_domain_id = dd.domain_id
@@ -374,6 +376,7 @@ func (h *BlockHandler) ListGroupedBlocks(w http.ResponseWriter, r *http.Request)
 		LEFT JOIN project pr ON p.project_id = pr.project_id
 		LEFT JOIN service s ON p.service_id = s.service_id
 		LEFT JOIN app_blacklist abl ON b.primary_app_id = abl.app_id
+		LEFT JOIN ml_suggestion ms ON b.block_id = ms.entity_id AND ms.entity_type = 'BLOCK' AND ms.status = 'PENDING'
 		WHERE abl.app_id IS NULL
 	`
 
@@ -411,6 +414,8 @@ func (h *BlockHandler) ListGroupedBlocks(w http.ResponseWriter, r *http.Request)
 		var appID int64
 		var primaryDomain, titleSummary, clientName, projectName, serviceName sql.NullString
 		var notes, description, metadata sql.NullString
+		var mlPayload sql.NullString
+		var mlConfidence sql.NullFloat64
 
 		err := rows.Scan(
 			&b.BlockID,
@@ -432,6 +437,8 @@ func (h *BlockHandler) ListGroupedBlocks(w http.ResponseWriter, r *http.Request)
 			&clientName,
 			&projectName,
 			&serviceName,
+			&mlPayload,
+			&mlConfidence,
 		)
 
 		if err != nil {
@@ -456,6 +463,29 @@ func (h *BlockHandler) ListGroupedBlocks(w http.ResponseWriter, r *http.Request)
 		if profileID.Valid {
 			pid := profileID.Int64
 			b.ProfileID = &pid
+		} else if mlPayload.Valid {
+			// Apply ML Suggestion if no profile assigned
+			var payload map[string]interface{}
+			if err := json.Unmarshal([]byte(mlPayload.String), &payload); err == nil {
+				if predictedID, ok := payload["predicted_profile_id"].(float64); ok {
+					pid := int64(predictedID)
+					b.ProfileID = &pid
+
+					// Use ML confidence (convert to string enum)
+					confVal := 0.0
+					if mlConfidence.Valid {
+						confVal = mlConfidence.Float64
+					}
+
+					if confVal >= 0.8 {
+						b.Confidence = "ML_HIGH"
+					} else if confVal >= 0.6 {
+						b.Confidence = "ML_MEDIUM"
+					} else {
+						b.Confidence = "ML_LOW"
+					}
+				}
+			}
 		}
 		if primaryDomain.Valid {
 			b.PrimaryDomain = &primaryDomain.String
@@ -577,40 +607,59 @@ func extractTitleContext(appName, title string) string {
 	appLower := strings.ToLower(appName)
 
 	// Special handling for common apps
-	switch {
-	case strings.Contains(appLower, "xero"):
-		// Xero titles are like "White Cat Studios | Xero" or "Dashboard | White Cat Studios | Xero"
-		parts := strings.Split(title, "|")
-		for _, part := range parts {
-			part = strings.TrimSpace(part)
-			if part != "" && !strings.EqualFold(part, "Xero") && !strings.EqualFold(part, "Dashboard") {
-				return part
-			}
-		}
-		return "Xero - General"
+	// Special handling for browser apps to extract web app context
+	isBrowser := strings.Contains(appLower, "chrome") || strings.Contains(appLower, "edge") || strings.Contains(appLower, "firefox") || strings.Contains(appLower, "opera") || strings.Contains(appLower, "brave")
 
-	case strings.Contains(appLower, "chrome") || strings.Contains(appLower, "edge") || strings.Contains(appLower, "firefox"):
-		// For browsers, try to extract domain or site name
+	if isBrowser {
+		// PRODUCTIVITY APPS DETECTION
+		// Detect Xero
+		if strings.Contains(strings.ToLower(title), "xero") {
+			return strings.TrimSpace(strings.Split(title, "|")[0]) // "Invoice 123 | Xero" -> "Invoice 123"
+		}
+		// Detect Gmail
+		if strings.Contains(strings.ToLower(title), "gmail") {
+			return "Gmail"
+		}
+		// Detect Outlook
+		if strings.Contains(strings.ToLower(title), "outlook") {
+			return "Outlook"
+		}
+		// Detect Google Docs/Sheets
+		if strings.Contains(strings.ToLower(title), "google docs") {
+			return "Google Docs"
+		}
+		if strings.Contains(strings.ToLower(title), "google sheets") {
+			return "Google Sheets"
+		}
+
+		// Generic browser extraction
 		parts := strings.Split(title, "-")
 		if len(parts) > 1 {
-			// Last part is usually the browser name
+			// Last part is usually the browser name, take the second to last part or first part
+			candidate := strings.TrimSpace(parts[len(parts)-2])
+			if candidate != "" {
+				return candidate
+			}
 			return strings.TrimSpace(parts[0])
 		}
 		return title
+	}
 
-	case strings.Contains(appLower, "excel"):
-		// Excel: "WorkbookName.xlsx - Excel"
+	// EXCEL
+	if strings.Contains(appLower, "excel") {
+		// "WorkbookName.xlsx - Excel"
 		parts := strings.Split(title, "-")
 		if len(parts) > 0 {
 			name := strings.TrimSpace(parts[0])
-			// Remove file extension
 			name = strings.TrimSuffix(name, ".xlsx")
 			name = strings.TrimSuffix(name, ".xls")
 			return name
 		}
 		return "Excel - General"
+	}
 
-	case strings.Contains(appLower, "word"):
+	// WORD
+	if strings.Contains(appLower, "word") {
 		parts := strings.Split(title, "-")
 		if len(parts) > 0 {
 			name := strings.TrimSpace(parts[0])
@@ -619,18 +668,18 @@ func extractTitleContext(appName, title string) string {
 			return name
 		}
 		return "Word - General"
-
-	default:
-		// For other apps, use first part before " - " if present
-		if idx := strings.Index(title, " - "); idx > 0 {
-			return strings.TrimSpace(title[:idx])
-		}
-		// Truncate long titles
-		if len(title) > 50 {
-			return title[:50] + "..."
-		}
-		return title
 	}
+
+	// GENERIC FALLBACK
+	// For other apps, use first part before " - " if present
+	if idx := strings.Index(title, " - "); idx > 0 {
+		return strings.TrimSpace(title[:idx])
+	}
+	// Truncate long titles
+	if len(title) > 80 {
+		return title[:80] + "..."
+	}
+	return title
 }
 
 // ReassignRequest represents a block reassignment request

@@ -13,7 +13,7 @@ import (
 
 // Noise filtering constants
 const (
-	MinBlockDuration = 30 * time.Second // Minimum duration to create a block
+	MinBlockDuration = 10 * time.Second // Minimum duration to create a block
 	MaxMergeGap      = 2 * time.Minute  // Maximum gap to merge same-app events
 )
 
@@ -29,8 +29,8 @@ type Aggregator struct {
 
 // Config holds aggregator configuration
 type AggregatorConfig struct {
-	Store         *store.Store
-	RetentionDays int           // How many days to keep raw events (default: 14)
+	Store          *store.Store
+	RetentionDays  int           // How many days to keep raw events (default: 14)
 	RollupInterval time.Duration // How often to run rollup (default: 5 minutes)
 }
 
@@ -217,11 +217,11 @@ type blockBuilder struct {
 
 func newBlockBuilder(event *store.RawEvent) *blockBuilder {
 	bb := &blockBuilder{
-		tsStart:      event.TsStart,
-		tsEnd:        *event.TsEnd,
-		primaryAppID: event.AppID,
-		titleIDs:     make(map[int64]bool),
-		domainIDs:    make(map[int64]bool),
+		tsStart:        event.TsStart,
+		tsEnd:          *event.TsEnd,
+		primaryAppID:   event.AppID,
+		titleIDs:       make(map[int64]bool),
+		domainIDs:      make(map[int64]bool),
 		activityScores: []float64{},
 	}
 
