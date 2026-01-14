@@ -136,5 +136,33 @@ func (s *Store) ensureSchema(db *sql.DB) error {
 		}
 	}
 
+	// 1.8.9 Migration: Profile name field (check before adding)
+	// Check if profile.name column exists
+	var hasNameColumn bool
+	rows, err := db.Query("PRAGMA table_info(profile)")
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var cid int
+			var name, dataType string
+			var notNull, dfltValue, pk interface{}
+			if err := rows.Scan(&cid, &name, &dataType, &notNull, &dfltValue, &pk); err == nil {
+				if name == "name" {
+					hasNameColumn = true
+					break
+				}
+			}
+		}
+	}
+
+	if !hasNameColumn {
+		_, err := db.Exec("ALTER TABLE profile ADD COLUMN name TEXT")
+		if err != nil {
+			log.Printf("Warning: Failed to add profile.name column: %v", err)
+		} else {
+			log.Printf("Added profile.name column via migration")
+		}
+	}
+
 	return nil
 }
