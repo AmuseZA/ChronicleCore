@@ -2,7 +2,7 @@
 # This downloads embedded Python and prepares all files
 
 param(
-    [string]$Version = "1.8.7"
+    [string]$Version = "1.8.8"
 )
 
 $ErrorActionPreference = "Stop"
