@@ -2,7 +2,7 @@
 ; Creates a single-EXE installer with everything embedded
 
 #define MyAppName "ChronicleCore"
-#define MyAppVersion "1.8.10"
+#define MyAppVersion "2.0.0"
 #define MyAppPublisher "ChronicleCore"
 #define MyAppExeName "ChronicleCore.bat"
 #define MyAppURL "https://github.com/yourusername/chroniclecore"
@@ -21,7 +21,7 @@ DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 OutputDir=installer_output
 OutputBaseFilename=ChronicleCore_Setup_v{#MyAppVersion}
-; SetupIconFile=resources\app_icon.ico
+SetupIconFile=resources\app_icon.ico
 UninstallDisplayIcon={app}\chroniclecore.exe
 Compression=lzma2/max
 SolidCompression=yes

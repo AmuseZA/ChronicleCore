@@ -2,6 +2,7 @@ package tracker
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"sync"
@@ -24,6 +25,15 @@ type Config struct {
 	PollInterval         time.Duration // How often to poll window info (default: 5s)
 	IdleThresholdSeconds int           // Idle threshold (default: 300s = 5 mins)
 	Store                *store.Store
+
+	// Deep tracking settings (loaded from settings on each capture)
+	DeepTrackingEnabled  bool
+	TrackBrowserContent  bool
+	TrackEmailContent    bool
+	TrackDocumentContent bool
+	TrackChatContent     bool
+	PrivacyMode          bool
+	ExcludedApps         []string
 }
 
 // Tracker manages activity tracking
@@ -38,6 +48,7 @@ type Tracker struct {
 	currentEventID    int64 // Track current open event
 	activitySamples   int   // Total samples in current poll interval
 	activeSampleCount int   // Number of samples where user was active
+	deepTracker       *DeepTracker
 }
 
 // Status represents current tracker status
@@ -253,19 +264,34 @@ func (t *Tracker) capture() {
 		}
 	}
 
+	// Extract and store domain if browser URL was captured
+	var domainID *int64
+	if winInfo.BrowserURL != "" {
+		domain := ExtractDomainFromURL(winInfo.BrowserURL)
+		if domain != "" {
+			id, err := t.config.Store.GetOrCreateDictDomain(domain)
+			if err != nil {
+				log.Printf("Failed to get/create domain dict: %v", err)
+			} else {
+				domainID = &id
+			}
+		}
+	}
+
 	// Update current window info with resolved IDs and State BEFORE checking for change
 	// This ensures t.currentWindow has the "new" state to compare against the "previous" state
 	// Wait, t.currentWindow holds the window from the *previous* capture iteration.
 	// We need to compare "previous" (t.currentWindow) vs "current" (winInfo).
 	// So we should NOT overwrite t.currentWindow yet.
 
-	// Check if context has changed (different app/title or state change)
-	contextChanged := t.shouldStartNewEvent(appID, titleID, eventState)
+	// Check if context has changed (different app/title/domain or state change)
+	contextChanged := t.shouldStartNewEvent(appID, titleID, domainID, eventState)
 
 	// Update t.currentWindow for next iteration
 	// We need to store specific fields for comparison next time
 	winInfo.AppID = appID
 	winInfo.TitleID = titleID
+	winInfo.DomainID = domainID
 	winInfo.State = eventState
 	t.currentWindow = winInfo // Now it becomes the "last" window for next loop
 
@@ -275,8 +301,33 @@ func (t *Tracker) capture() {
 			t.closeCurrentEvent()
 		}
 
-		// Prepare Metadata JSON
-		metadata := fmt.Sprintf(`{"activity_score": %.2f}`, activityScore)
+		// Build metadata map
+		metaMap := map[string]interface{}{
+			"activity_score": activityScore,
+		}
+
+		if winInfo.BrowserURL != "" {
+			metaMap["browser_url"] = winInfo.BrowserURL
+		}
+
+		// Deep tracking: extract detailed content if enabled
+		if t.config.DeepTrackingEnabled && !winInfo.IsIdle {
+			deepInfo := t.extractDeepTrackingInfo(winInfo)
+			if deepInfo != nil {
+				// Merge deep tracking info into metadata
+				for k, v := range deepInfo.ToMetadataMap() {
+					metaMap[k] = v
+				}
+			}
+		}
+
+		// Serialize metadata to JSON
+		metaBytes, err := json.Marshal(metaMap)
+		if err != nil {
+			log.Printf("Failed to marshal metadata: %v", err)
+			metaBytes = []byte(fmt.Sprintf(`{"activity_score": %.2f}`, activityScore))
+		}
+		metadata := string(metaBytes)
 
 		// Create new event
 		event := &store.RawEvent{
@@ -284,6 +335,7 @@ func (t *Tracker) capture() {
 			TsEnd:    nil, // Open-ended
 			AppID:    appID,
 			TitleID:  titleID,
+			DomainID: domainID,
 			State:    eventState,
 			Source:   "OS",
 			Metadata: &metadata,
@@ -309,7 +361,7 @@ func (t *Tracker) capture() {
 }
 
 // shouldStartNewEvent determines if a new event should be created
-func (t *Tracker) shouldStartNewEvent(appID int64, titleID *int64, state string) bool {
+func (t *Tracker) shouldStartNewEvent(appID int64, titleID *int64, domainID *int64, state string) bool {
 	// If no current event, always start new one
 	if t.currentEventID == 0 {
 		return true
@@ -329,9 +381,19 @@ func (t *Tracker) shouldStartNewEvent(appID int64, titleID *int64, state string)
 		titlesDiffer = *t.currentWindow.TitleID != *titleID
 	}
 
+	// Helper to check if domainIDs differ (handling nil pointers)
+	domainsDiffer := false
+	if (t.currentWindow.DomainID == nil && domainID != nil) ||
+		(t.currentWindow.DomainID != nil && domainID == nil) {
+		domainsDiffer = true
+	} else if t.currentWindow.DomainID != nil && domainID != nil {
+		domainsDiffer = *t.currentWindow.DomainID != *domainID
+	}
+
 	// Check if context has changed
 	if t.currentWindow.AppID != appID ||
 		titlesDiffer ||
+		domainsDiffer ||
 		t.currentWindow.State != state {
 		return true
 	}
@@ -360,4 +422,46 @@ func (t *Tracker) closeCurrentEvent() {
 	}
 
 	t.currentEventID = 0
+}
+
+// extractDeepTrackingInfo extracts detailed information from the current window
+func (t *Tracker) extractDeepTrackingInfo(winInfo *WindowInfo) *DeepTrackingInfo {
+	// Create or update deep tracker with current settings
+	if t.deepTracker == nil {
+		t.deepTracker = NewDeepTracker(DeepTrackerConfig{
+			TrackBrowserContent:  t.config.TrackBrowserContent,
+			TrackEmailContent:    t.config.TrackEmailContent,
+			TrackDocumentContent: t.config.TrackDocumentContent,
+			TrackChatContent:     t.config.TrackChatContent,
+			PrivacyMode:          t.config.PrivacyMode,
+			ExcludedApps:         t.config.ExcludedApps,
+		})
+	}
+
+	// Get foreground window handle for deep extraction
+	hwnd, err := GetForegroundWindow()
+	if err != nil {
+		return nil
+	}
+
+	return t.deepTracker.ExtractDeepInfo(hwnd, winInfo.ProcessName, winInfo.WindowTitle)
+}
+
+// UpdateDeepTrackingConfig updates the deep tracking configuration
+func (t *Tracker) UpdateDeepTrackingConfig(enabled bool, browserContent, emailContent, docContent, chatContent, privacy bool, excluded []string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	t.config.DeepTrackingEnabled = enabled
+	t.config.TrackBrowserContent = browserContent
+	t.config.TrackEmailContent = emailContent
+	t.config.TrackDocumentContent = docContent
+	t.config.TrackChatContent = chatContent
+	t.config.PrivacyMode = privacy
+	t.config.ExcludedApps = excluded
+
+	// Reset deep tracker to pick up new config
+	t.deepTracker = nil
+
+	log.Printf("Deep tracking config updated: enabled=%v, privacy=%v", enabled, privacy)
 }

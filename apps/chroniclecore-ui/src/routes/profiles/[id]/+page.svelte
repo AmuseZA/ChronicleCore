@@ -5,6 +5,7 @@
     import { fetchApi } from "$lib/api";
     import { settings } from "$lib/stores/settings";
     import { format, parseISO, startOfMonth, endOfMonth, subMonths, addMonths } from "date-fns";
+    import ProfileSelector from "$lib/components/ProfileSelector.svelte";
 
     interface ProfileStats {
         profile_id: number;
@@ -38,9 +39,18 @@
         locked: boolean;
     }
 
+    interface GroupedByDate {
+        date: string;
+        dateFormatted: string;
+        blocks: Block[];
+        totalMinutes: number;
+    }
+
     let stats: ProfileStats | null = null;
     let loading = true;
     let error: string | null = null;
+    let processingBlockId: number | null = null;
+    let expandedDates: Set<string> = new Set();
 
     // View mode: 'lifetime' | 'monthly'
     let viewMode: 'lifetime' | 'monthly' = 'monthly';
@@ -49,6 +59,33 @@
     let selectedMonth: Date = new Date();
 
     $: profileId = $page.params.id;
+
+    // Group blocks by date
+    $: groupedBlocks = groupBlocksByDate(stats?.recent_blocks || []);
+
+    function groupBlocksByDate(blocks: Block[]): GroupedByDate[] {
+        const groups = new Map<string, GroupedByDate>();
+
+        for (const block of blocks) {
+            const date = format(parseISO(block.ts_start), "yyyy-MM-dd");
+
+            if (!groups.has(date)) {
+                groups.set(date, {
+                    date,
+                    dateFormatted: format(parseISO(block.ts_start), "EEEE, MMMM d, yyyy"),
+                    blocks: [],
+                    totalMinutes: 0
+                });
+            }
+
+            const group = groups.get(date)!;
+            group.blocks.push(block);
+            group.totalMinutes += block.duration_minutes;
+        }
+
+        // Sort by date descending
+        return Array.from(groups.values()).sort((a, b) => b.date.localeCompare(a.date));
+    }
 
     async function loadStats() {
         loading = true;
@@ -65,6 +102,13 @@
             }
 
             stats = await fetchApi(url);
+
+            // Auto-expand the first date group
+            if (stats?.recent_blocks && stats.recent_blocks.length > 0) {
+                const firstDate = format(parseISO(stats.recent_blocks[0].ts_start), "yyyy-MM-dd");
+                expandedDates.add(firstDate);
+                expandedDates = expandedDates;
+            }
         } catch (e: any) {
             error = e.message || "Failed to load profile stats";
         } finally {
@@ -103,6 +147,15 @@
         loadStats();
     }
 
+    function toggleDateGroup(date: string) {
+        if (expandedDates.has(date)) {
+            expandedDates.delete(date);
+        } else {
+            expandedDates.add(date);
+        }
+        expandedDates = expandedDates;
+    }
+
     function getConfidenceStyle(confidence: string) {
         switch (confidence) {
             case "HIGH":
@@ -113,6 +166,45 @@
                 return "bg-red-50 text-red-700 border-red-200";
             default:
                 return "bg-slate-50 text-slate-700 border-slate-200";
+        }
+    }
+
+    async function reassignBlock(blockId: number, newProfileId: number | null) {
+        if (newProfileId === null) return;
+
+        processingBlockId = blockId;
+        try {
+            await fetchApi(`/blocks/${blockId}/reassign`, {
+                method: "POST",
+                body: JSON.stringify({ profile_id: newProfileId }),
+            });
+            // Reload stats to reflect the change (block will be removed from this profile)
+            await loadStats();
+        } catch (e) {
+            console.error(e);
+            alert("Failed to reassign block");
+        } finally {
+            processingBlockId = null;
+        }
+    }
+
+    async function unassignBlock(blockId: number) {
+        if (!confirm("Are you sure you want to unassign this block? It will appear in the Review queue.")) {
+            return;
+        }
+
+        processingBlockId = blockId;
+        try {
+            await fetchApi(`/blocks/${blockId}/reassign`, {
+                method: "POST",
+                body: JSON.stringify({ profile_id: null }),
+            });
+            await loadStats();
+        } catch (e) {
+            console.error(e);
+            alert("Failed to unassign block");
+        } finally {
+            processingBlockId = null;
         }
     }
 
@@ -267,69 +359,128 @@
             </div>
         </div>
 
-        <!-- Recent Activity Table -->
-        <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div class="px-6 py-4 border-b border-slate-100">
+        <!-- Activity Grouped by Date -->
+        <div class="space-y-4">
+            <div class="flex items-center justify-between">
                 <h2 class="text-lg font-semibold text-slate-900">
                     {viewMode === 'lifetime' ? 'Recent Activity' : `Activity for ${format(selectedMonth, 'MMMM yyyy')}`}
                 </h2>
+                <span class="text-sm text-slate-500">
+                    {groupedBlocks.length} day{groupedBlocks.length !== 1 ? 's' : ''} with activity
+                </span>
             </div>
 
-            {#if stats.recent_blocks && stats.recent_blocks.length > 0}
-                <table class="w-full text-left">
-                    <thead class="bg-slate-50 border-b border-slate-200">
-                        <tr>
-                            <th class="px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide">Date & Time</th>
-                            <th class="px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide">Activity</th>
-                            <th class="px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide text-right">Duration</th>
-                            <th class="px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        {#each stats.recent_blocks as block (block.block_id)}
-                            <tr class="hover:bg-slate-50 transition-colors">
-                                <td class="px-6 py-4 text-sm text-slate-600">
-                                    <div class="font-medium text-slate-900">
-                                        {format(parseISO(block.ts_start), "MMM d, yyyy")}
-                                    </div>
-                                    <div class="text-xs text-slate-500">
-                                        {format(parseISO(block.ts_start), "HH:mm")} - {format(parseISO(block.ts_end), "HH:mm")}
-                                    </div>
-                                </td>
-                                <td class="px-6 py-4">
-                                    <div class="text-sm text-slate-900 truncate max-w-md">
-                                        {block.title_summary || block.primary_app_name}
-                                    </div>
-                                    <div class="text-xs text-slate-500">{block.primary_app_name}</div>
-                                </td>
-                                <td class="px-6 py-4 text-right">
-                                    <div class="text-sm font-medium text-slate-900 tabular-nums">
-                                        {block.duration_minutes.toFixed(0)} min
-                                    </div>
-                                </td>
-                                <td class="px-6 py-4">
-                                    <div class="flex items-center gap-2">
-                                        <span class="text-xs px-2 py-1 rounded-md border {getConfidenceStyle(block.confidence)}">
-                                            {block.confidence}
-                                        </span>
-                                        {#if block.locked}
-                                            <span class="text-xs px-2 py-1 rounded-md bg-green-50 text-green-700 border border-green-200">
-                                                Locked
-                                            </span>
-                                        {/if}
-                                        {#if !block.billable}
-                                            <span class="text-xs px-2 py-1 rounded-md bg-slate-50 text-slate-600 border border-slate-200">
-                                                Non-billable
-                                            </span>
-                                        {/if}
-                                    </div>
-                                </td>
-                            </tr>
-                        {/each}
-                    </tbody>
-                </table>
+            {#if groupedBlocks.length > 0}
+                {#each groupedBlocks as dateGroup (dateGroup.date)}
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                        <!-- Date Header -->
+                        <button
+                            on:click={() => toggleDateGroup(dateGroup.date)}
+                            class="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
+                        >
+                            <div class="flex items-center gap-4">
+                                <div class="flex items-center gap-2">
+                                    <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    </svg>
+                                    <span class="font-semibold text-slate-900">{dateGroup.dateFormatted}</span>
+                                </div>
+                                <span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs font-medium">
+                                    {dateGroup.blocks.length} block{dateGroup.blocks.length !== 1 ? 's' : ''}
+                                </span>
+                            </div>
+                            <div class="flex items-center gap-4">
+                                <span class="font-medium text-slate-700 tabular-nums">
+                                    {(dateGroup.totalMinutes / 60).toFixed(1)}h
+                                </span>
+                                <svg
+                                    class="w-5 h-5 text-slate-400 transition-transform {expandedDates.has(dateGroup.date) ? 'rotate-180' : ''}"
+                                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                                >
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </div>
+                        </button>
+
+                        <!-- Blocks List (Expanded) -->
+                        {#if expandedDates.has(dateGroup.date)}
+                            <div class="border-t border-slate-100">
+                                <div class="divide-y divide-slate-100">
+                                    {#each dateGroup.blocks as block (block.block_id)}
+                                        <div class="px-6 py-4 hover:bg-slate-50 transition-colors flex items-start gap-4">
+                                            <!-- Time Column -->
+                                            <div class="w-24 shrink-0">
+                                                <div class="text-sm font-medium text-slate-900">
+                                                    {format(parseISO(block.ts_start), "HH:mm")}
+                                                </div>
+                                                <div class="text-xs text-slate-500">
+                                                    to {format(parseISO(block.ts_end), "HH:mm")}
+                                                </div>
+                                            </div>
+
+                                            <!-- Activity Info -->
+                                            <div class="flex-1 min-w-0">
+                                                <div class="text-sm text-slate-900 break-words">
+                                                    {block.title_summary || block.primary_app_name}
+                                                </div>
+                                                <div class="flex items-center gap-2 mt-1">
+                                                    <span class="text-xs text-slate-500">{block.primary_app_name}</span>
+                                                    <span class="text-slate-300">•</span>
+                                                    <span class="text-xs font-medium text-slate-600 tabular-nums">{block.duration_minutes.toFixed(0)} min</span>
+                                                </div>
+                                            </div>
+
+                                            <!-- Status Badges -->
+                                            <div class="flex items-center gap-2 shrink-0">
+                                                <span class="text-xs px-2 py-1 rounded-md border {getConfidenceStyle(block.confidence)}">
+                                                    {block.confidence}
+                                                </span>
+                                                {#if block.locked}
+                                                    <span class="text-xs px-2 py-1 rounded-md bg-green-50 text-green-700 border border-green-200">
+                                                        Locked
+                                                    </span>
+                                                {/if}
+                                                {#if !block.billable}
+                                                    <span class="text-xs px-2 py-1 rounded-md bg-slate-50 text-slate-600 border border-slate-200">
+                                                        Non-billable
+                                                    </span>
+                                                {/if}
+                                            </div>
+
+                                            <!-- Actions -->
+                                            <div class="flex items-center gap-2 shrink-0">
+                                                {#if !block.locked}
+                                                    <div class="w-36">
+                                                        <ProfileSelector
+                                                            placeholder="Change..."
+                                                            value={stats?.profile_id}
+                                                            disabled={processingBlockId === block.block_id}
+                                                            on:change={(e) => reassignBlock(block.block_id, e.detail)}
+                                                        />
+                                                    </div>
+                                                    <button
+                                                        on:click={() => unassignBlock(block.block_id)}
+                                                        disabled={processingBlockId === block.block_id}
+                                                        class="text-xs text-slate-400 hover:text-red-600 transition-colors disabled:opacity-50"
+                                                        title="Remove from this profile"
+                                                    >
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                                        </svg>
+                                                    </button>
+                                                {:else}
+                                                    <span class="text-xs text-slate-400 italic">Locked</span>
+                                                {/if}
+                                            </div>
+                                        </div>
+                                    {/each}
+                                </div>
+                            </div>
+                        {/if}
+                    </div>
+                {/each}
             {:else}
-                <div class="p-12 text-center">
+                <div class="bg-white rounded-xl border border-slate-200 p-12 text-center">
                     <div class="w-12 h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-3">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />

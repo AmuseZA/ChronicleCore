@@ -120,6 +120,11 @@ func (s *Store) ensureSchema(db *sql.DB) error {
 		  actor             TEXT NOT NULL DEFAULT 'USER',
 		  created_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 		);`,
+
+		// 1.8.11 Migration: Activity-weighted billing
+		// Add activity_score column for efficient billing calculations
+		// Score is 0.0-1.0 representing percentage of time user was actively working
+		`ALTER TABLE block ADD COLUMN activity_score REAL DEFAULT 1.0`,
 	}
 
 	for _, query := range queries {

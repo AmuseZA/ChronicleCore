@@ -666,12 +666,14 @@ func (h *ProfileHandler) GetProfileStats(w http.ResponseWriter, r *http.Request)
 	stats.RateAmount = float64(minorUnits) / 100.0
 
 	// Build stats query
+	// Activity-weighted billing: billable_minutes = duration * activity_score
+	// This ensures only actual active work time is billed, not idle time within blocks
 	statsQuery := `
 		SELECT
 			COUNT(*) as total_blocks,
 			COALESCE(SUM((strftime('%s', ts_end) - strftime('%s', ts_start)) / 60.0), 0) as total_minutes,
-			COALESCE(SUM(CASE WHEN billable = 1 THEN (strftime('%s', ts_end) - strftime('%s', ts_start)) / 60.0 ELSE 0 END), 0) as billable_minutes,
-			COALESCE(SUM(CASE WHEN locked = 1 THEN (strftime('%s', ts_end) - strftime('%s', ts_start)) / 60.0 ELSE 0 END), 0) as locked_minutes
+			COALESCE(SUM(CASE WHEN billable = 1 THEN ((strftime('%s', ts_end) - strftime('%s', ts_start)) / 60.0) * COALESCE(activity_score, 1.0) ELSE 0 END), 0) as billable_minutes,
+			COALESCE(SUM(CASE WHEN locked = 1 THEN ((strftime('%s', ts_end) - strftime('%s', ts_start)) / 60.0) * COALESCE(activity_score, 1.0) ELSE 0 END), 0) as locked_minutes
 		FROM block
 		WHERE profile_id = ?
 	`

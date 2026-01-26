@@ -346,6 +346,7 @@ func (h *MLHandler) PredictBlocks(w http.ResponseWriter, r *http.Request) {
 
 // GetSuggestions retrieves pending ML suggestions
 func (h *MLHandler) GetSuggestions(w http.ResponseWriter, r *http.Request) {
+	// Join with block table to get block details directly
 	query := `
 		SELECT
 			s.suggestion_id,
@@ -355,8 +356,19 @@ func (h *MLHandler) GetSuggestions(w http.ResponseWriter, r *http.Request) {
 			s.payload_json,
 			s.confidence,
 			s.status,
-			s.created_at
+			s.created_at,
+			da.app_name,
+			dt.title_text,
+			b.ts_start,
+			b.ts_end,
+			p.name as profile_name,
+			c.name as client_name
 		FROM ml_suggestion s
+		LEFT JOIN block b ON s.entity_type = 'BLOCK' AND s.entity_id = b.block_id
+		LEFT JOIN dict_app da ON b.primary_app_id = da.app_id
+		LEFT JOIN dict_title dt ON b.title_summary_id = dt.title_id
+		LEFT JOIN profile p ON json_extract(s.payload_json, '$.predicted_profile_id') = p.profile_id
+		LEFT JOIN client c ON p.client_id = c.client_id
 		WHERE s.status = 'PENDING'
 		ORDER BY s.confidence DESC, s.created_at DESC
 		LIMIT 50
@@ -369,6 +381,14 @@ func (h *MLHandler) GetSuggestions(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
+	type BlockDetails struct {
+		AppName       string  `json:"app_name"`
+		TitleSummary  string  `json:"title_summary"`
+		TsStart       string  `json:"ts_start"`
+		TsEnd         string  `json:"ts_end"`
+		DurationMins  float64 `json:"duration_minutes"`
+	}
+
 	type Suggestion struct {
 		SuggestionID   int                    `json:"suggestion_id"`
 		EntityType     string                 `json:"entity_type"`
@@ -378,6 +398,8 @@ func (h *MLHandler) GetSuggestions(w http.ResponseWriter, r *http.Request) {
 		Confidence     float64                `json:"confidence"`
 		Status         string                 `json:"status"`
 		CreatedAt      string                 `json:"created_at"`
+		BlockDetails   *BlockDetails          `json:"block_details,omitempty"`
+		ProfileName    string                 `json:"profile_name,omitempty"`
 	}
 
 	var suggestions []Suggestion
@@ -385,14 +407,50 @@ func (h *MLHandler) GetSuggestions(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var s Suggestion
 		var payloadJSON string
+		var appName, titleText, tsStart, tsEnd, profileName, clientName sql.NullString
 
-		if err := rows.Scan(&s.SuggestionID, &s.EntityType, &s.EntityID, &s.SuggestionType, &payloadJSON, &s.Confidence, &s.Status, &s.CreatedAt); err != nil {
-			log.Printf("Error scanning row: %v", err)
+		if err := rows.Scan(&s.SuggestionID, &s.EntityType, &s.EntityID, &s.SuggestionType, &payloadJSON, &s.Confidence, &s.Status, &s.CreatedAt, &appName, &titleText, &tsStart, &tsEnd, &profileName, &clientName); err != nil {
+			log.Printf("Error scanning suggestion row: %v", err)
 			continue
 		}
 
 		// Parse payload JSON
 		json.Unmarshal([]byte(payloadJSON), &s.Payload)
+
+		// Populate block details if available
+		if appName.Valid {
+			bd := &BlockDetails{
+				AppName:      appName.String,
+				TitleSummary: appName.String, // Default to app name
+			}
+			if titleText.Valid && titleText.String != "" {
+				bd.TitleSummary = titleText.String
+			}
+			if tsStart.Valid {
+				bd.TsStart = tsStart.String
+			}
+			if tsEnd.Valid {
+				bd.TsEnd = tsEnd.String
+			}
+			// Calculate duration
+			if tsStart.Valid && tsEnd.Valid {
+				start, err1 := time.Parse(time.RFC3339, tsStart.String)
+				end, err2 := time.Parse(time.RFC3339, tsEnd.String)
+				if err1 == nil && err2 == nil {
+					bd.DurationMins = end.Sub(start).Minutes()
+				}
+			}
+			s.BlockDetails = bd
+		}
+
+		// Populate profile name
+		if profileName.Valid {
+			if clientName.Valid && clientName.String != "" {
+				s.ProfileName = profileName.String + " (" + clientName.String + ")"
+			} else {
+				s.ProfileName = profileName.String
+			}
+		}
 
 		suggestions = append(suggestions, s)
 	}

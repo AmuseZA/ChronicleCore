@@ -1,0 +1,36 @@
+{
+  "manifest_version": 2,
+  "name": "ChronicleCore Time Tracker",
+  "version": "1.0.0",
+  "description": "Automatically track browser activity for time tracking and billing. Generates human-readable activity descriptions.",
+  "permissions": [
+    "tabs",
+    "activeTab",
+    "storage",
+    "http://127.0.0.1:8080/*",
+    "http://localhost:8080/*"
+  ],
+  "background": {
+    "scripts": ["patterns.js", "background.js"],
+    "persistent": false
+  },
+  "browser_action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "chroniclecore@localhost",
+      "strict_min_version": "109.0"
+    }
+  }
+}

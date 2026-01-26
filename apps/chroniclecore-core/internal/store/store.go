@@ -56,6 +56,7 @@ type Block struct {
 	Notes            *string
 	Description      *string
 	Metadata         *string
+	ActivityScore    float64 // 0.0-1.0 representing active work percentage for billing
 }
 
 // NewStore creates a new store instance (not yet initialized)
@@ -463,8 +464,8 @@ func (s *Store) InsertBlock(block *Block) error {
 		INSERT INTO block (
 			ts_start, ts_end, primary_app_id, primary_domain_id,
 			title_summary_id, profile_id, confidence, billable,
-			locked, notes, description, metadata
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			locked, notes, description, metadata, activity_score
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	result, err := s.DB.Exec(
@@ -481,6 +482,7 @@ func (s *Store) InsertBlock(block *Block) error {
 		block.Notes,
 		block.Description,
 		block.Metadata,
+		block.ActivityScore,
 	)
 
 	if err != nil {
@@ -526,4 +528,102 @@ func (s *Store) DeleteBlock(blockID int64) error {
 // GetDB returns the underlying database connection (for advanced queries)
 func (s *Store) GetDB() *sql.DB {
 	return s.DB
+}
+
+// ============================================================
+// Settings Management
+// ============================================================
+
+// GetSetting retrieves a setting value by key
+func (s *Store) GetSetting(key string) (string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if !s.initialized {
+		return "", fmt.Errorf("store not initialized")
+	}
+
+	var value string
+	err := s.DB.QueryRow(
+		"SELECT value FROM settings WHERE key = ?",
+		key,
+	).Scan(&value)
+
+	if err == sql.ErrNoRows {
+		return "", nil // Return empty string for missing keys
+	}
+
+	if err != nil {
+		return "", fmt.Errorf("failed to get setting %s: %w", key, err)
+	}
+
+	return value, nil
+}
+
+// SetSetting sets a setting value by key
+func (s *Store) SetSetting(key, value string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !s.initialized {
+		return fmt.Errorf("store not initialized")
+	}
+
+	_, err := s.DB.Exec(`
+		INSERT INTO settings (key, value, is_encrypted)
+		VALUES (?, ?, 0)
+		ON CONFLICT(key) DO UPDATE SET value = excluded.value
+	`, key, value)
+
+	if err != nil {
+		return fmt.Errorf("failed to set setting %s: %w", key, err)
+	}
+
+	return nil
+}
+
+// GetSettingBool retrieves a boolean setting (returns false if not set)
+func (s *Store) GetSettingBool(key string) (bool, error) {
+	value, err := s.GetSetting(key)
+	if err != nil {
+		return false, err
+	}
+
+	return value == "true" || value == "1", nil
+}
+
+// SetSettingBool sets a boolean setting
+func (s *Store) SetSettingBool(key string, value bool) error {
+	strValue := "false"
+	if value {
+		strValue = "true"
+	}
+	return s.SetSetting(key, strValue)
+}
+
+// GetAllSettings retrieves all settings as a map
+func (s *Store) GetAllSettings() (map[string]string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if !s.initialized {
+		return nil, fmt.Errorf("store not initialized")
+	}
+
+	rows, err := s.DB.Query("SELECT key, value FROM settings WHERE is_encrypted = 0")
+	if err != nil {
+		return nil, fmt.Errorf("failed to query settings: %w", err)
+	}
+	defer rows.Close()
+
+	settings := make(map[string]string)
+	for rows.Next() {
+		var key, value string
+		if err := rows.Scan(&key, &value); err != nil {
+			return nil, fmt.Errorf("failed to scan setting: %w", err)
+		}
+		settings[key] = value
+	}
+
+	return settings, rows.Err()
 }

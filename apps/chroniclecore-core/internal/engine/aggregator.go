@@ -322,28 +322,30 @@ func (bb *blockBuilder) build() *store.Block {
 	}
 
 	// Calculate average activity score
+	var activityScore float64 = 1.0 // Default to 100% if no scores captured
 	var metadata *string
 	if len(bb.activityScores) > 0 {
 		var sum float64
 		for _, s := range bb.activityScores {
 			sum += s
 		}
-		avg := sum / float64(len(bb.activityScores))
-		jsonStr := fmt.Sprintf(`{"avg_activity_score": %.2f}`, avg)
+		activityScore = sum / float64(len(bb.activityScores))
+		jsonStr := fmt.Sprintf(`{"avg_activity_score": %.2f}`, activityScore)
 		metadata = &jsonStr
 	}
 
-	// Create block
+	// Create block with activity score for billing calculations
 	block := &store.Block{
 		TsStart:         bb.tsStart,
 		TsEnd:           bb.tsEnd,
 		PrimaryAppID:    bb.primaryAppID,
 		TitleSummaryID:  titleID,
 		PrimaryDomainID: domainID,
-		Confidence:      "LOW", // Will be assigned by rules engine
-		Billable:        true,  // Default to billable (idle time excluded)
+		Confidence:      "LOW",          // Will be assigned by rules engine
+		Billable:        true,           // Default to billable (idle time excluded)
 		Locked:          false,
 		Metadata:        metadata,
+		ActivityScore:   activityScore,  // Activity-weighted billing support
 	}
 
 	return block

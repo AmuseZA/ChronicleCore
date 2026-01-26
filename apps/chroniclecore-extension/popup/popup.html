@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChronicleCore</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="../icons/icon48.png" alt="ChronicleCore" class="logo">
+      <div class="header-text">
+        <h1>ChronicleCore</h1>
+        <span class="version">v1.0.0</span>
+      </div>
+    </div>
+
+    <div id="serverStatus" class="status status-checking">
+      <span class="status-dot"></span>
+      <span class="status-text">Checking server...</span>
+    </div>
+
+    <div id="trackingStatus" class="status status-active">
+      <span class="status-dot"></span>
+      <span class="status-text">Tracking active</span>
+    </div>
+
+    <div class="buttons">
+      <button id="toggleBtn" class="btn btn-primary">
+        <span id="toggleIcon">&#9208;</span>
+        <span id="toggleText">Pause Tracking</span>
+      </button>
+
+      <button id="dashboardBtn" class="btn btn-secondary">
+        <span>&#128200;</span>
+        Open Dashboard
+      </button>
+    </div>
+
+    <div id="lastActivity" class="last-activity">
+      <span class="label">Last activity:</span>
+      <span id="lastActivityText" class="value">--</span>
+    </div>
+
+    <div class="footer">
+      <a href="http://127.0.0.1:8080" target="_blank">Open ChronicleCore</a>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

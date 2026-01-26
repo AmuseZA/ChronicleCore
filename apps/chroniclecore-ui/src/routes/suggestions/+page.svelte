@@ -56,43 +56,31 @@
     async function loadSuggestions() {
         loading = true;
         try {
-            // Fetch suggestions
+            // Fetch suggestions (now includes block_details and profile_name from API)
             const suggestionsData = await fetchApi("/ml/suggestions");
             suggestions = suggestionsData || [];
 
-            // Fetch profiles for name lookup
+            // Fetch profiles for fallback name lookup
             const profilesData = await fetchApi("/profiles");
             profiles = profilesData || [];
 
-            // Enrich suggestions with profile names
+            // Fill in profile_name if not provided by API (fallback)
             for (const s of suggestions) {
-                const profile = profiles.find(
-                    (p) => p.profile_id === s.payload.predicted_profile_id,
-                );
-                if (profile) {
-                    s.profile_name = profile.client_name
-                        ? `${profile.name} (${profile.client_name})`
-                        : profile.name;
-                }
-
-                // Fetch block details
-                try {
-                    const block = await fetchApi(`/blocks/${s.entity_id}`);
-                    if (block) {
-                        s.block_details = {
-                            app_name: block.primary_app_name,
-                            title_summary:
-                                block.title_summary || block.primary_app_name,
-                            ts_start: block.ts_start,
-                            ts_end: block.ts_end,
-                            duration_minutes: block.duration_minutes,
-                        };
-                    }
-                } catch (e) {
-                    console.warn(
-                        `Failed to fetch block details for ${s.entity_id}`,
-                        e,
+                if (!s.profile_name && s.payload?.predicted_profile_id) {
+                    const profile = profiles.find(
+                        (p) => p.profile_id === s.payload.predicted_profile_id,
                     );
+                    if (profile) {
+                        // Use client_name if profile.name is null/undefined
+                        const displayName =
+                            profile.name ||
+                            profile.client_name ||
+                            `Profile #${profile.profile_id}`;
+                        s.profile_name =
+                            profile.client_name && profile.name
+                                ? `${profile.name} (${profile.client_name})`
+                                : displayName;
+                    }
                 }
             }
 

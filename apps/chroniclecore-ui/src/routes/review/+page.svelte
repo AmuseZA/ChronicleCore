@@ -18,6 +18,10 @@
         billable: boolean;
         activity_score?: number;
         notes?: string;
+        // ML Suggestion fields
+        has_ml_suggestion?: boolean;
+        ml_suggested_profile_id?: number;
+        ml_confidence?: number;
     }
 
     interface GroupedBlock {
@@ -25,6 +29,7 @@
         primary_app_name: string;
         app_id: number;
         title_context: string;
+        date: string; // YYYY-MM-DD
         total_minutes: number;
         total_hours: number;
         block_count: number;
@@ -452,6 +457,13 @@
                                             <div
                                                 class="flex items-center gap-2 mb-1"
                                             >
+                                                {#if group.date}
+                                                    <span
+                                                        class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-700 border border-blue-200 whitespace-nowrap"
+                                                    >
+                                                        {format(parseISO(group.date), "MMM d")}
+                                                    </span>
+                                                {/if}
                                                 <h3
                                                     class="font-semibold text-lg text-slate-900 leading-tight break-words"
                                                 >
@@ -715,12 +727,10 @@
                                                         class="w-48 shrink-0 flex flex-col gap-2 items-end"
                                                     >
                                                         <ProfileSelector
-                                                            placeholder={block.confidence?.startsWith(
-                                                                "ML",
-                                                            )
-                                                                ? "Confirm AI..."
+                                                            placeholder={block.has_ml_suggestion
+                                                                ? "Has AI suggestion..."
                                                                 : "Assign..."}
-                                                            selectedId={block.profile_id}
+                                                            value={block.profile_id}
                                                             disabled={processingId ===
                                                                 block.block_id}
                                                             on:change={(e) =>
@@ -774,6 +784,13 @@
                                             <div
                                                 class="flex items-center gap-2 mb-1"
                                             >
+                                                {#if group.date}
+                                                    <span
+                                                        class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-700 border border-blue-200 whitespace-nowrap"
+                                                    >
+                                                        {format(parseISO(group.date), "MMM d")}
+                                                    </span>
+                                                {/if}
                                                 <h3
                                                     class="font-semibold text-lg text-slate-900 leading-tight break-words"
                                                 >
@@ -815,7 +832,7 @@
                                         >
                                             <ProfileSelector
                                                 placeholder="Reassign..."
-                                                selectedId={group.blocks.find(
+                                                value={group.blocks.find(
                                                     (b) => b.profile_id,
                                                 )?.profile_id}
                                                 on:change={(e) =>
@@ -921,7 +938,7 @@
                                                     </div>
                                                     <div class="w-48 shrink-0">
                                                         <ProfileSelector
-                                                            selectedId={block.profile_id}
+                                                            value={block.profile_id}
                                                             disabled={processingId ===
                                                                 block.block_id}
                                                             on:change={(e) =>

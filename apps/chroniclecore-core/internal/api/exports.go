@@ -153,6 +153,7 @@ func (h *ExportHandler) ExportInvoiceLines(w http.ResponseWriter, r *http.Reques
 }
 
 // queryInvoiceLines retrieves blocks from database
+// Uses activity-weighted billing: duration is multiplied by activity_score
 func (h *ExportHandler) queryInvoiceLines(startDate, endDate time.Time, profileIDs []int64) ([]InvoiceLine, error) {
 	query := `
 		SELECT
@@ -164,7 +165,8 @@ func (h *ExportHandler) queryInvoiceLines(startDate, endDate time.Time, profileI
 			COALESCE(pr.name, '') as project_name,
 			s.name as service_name,
 			r.hourly_minor_units,
-			r.currency_code
+			r.currency_code,
+			COALESCE(b.activity_score, 1.0) as activity_score
 		FROM block b
 		JOIN profile p ON b.profile_id = p.profile_id
 		JOIN client c ON p.client_id = c.client_id
@@ -208,6 +210,7 @@ func (h *ExportHandler) queryInvoiceLines(startDate, endDate time.Time, profileI
 		var description sql.NullString
 		var confidence, client, project, service, currency string
 		var minorUnits int64
+		var activityScore float64
 
 		err := rows.Scan(
 			&tsStart,
@@ -219,6 +222,7 @@ func (h *ExportHandler) queryInvoiceLines(startDate, endDate time.Time, profileI
 			&service,
 			&minorUnits,
 			&currency,
+			&activityScore,
 		)
 		if err != nil {
 			return nil, err
@@ -228,9 +232,10 @@ func (h *ExportHandler) queryInvoiceLines(startDate, endDate time.Time, profileI
 		start, _ := time.Parse(time.RFC3339, tsStart)
 		end, _ := time.Parse(time.RFC3339, tsEnd)
 
-		// Calculate duration in hours
+		// Calculate duration in hours with activity weighting
+		// This ensures only actual active work time is billed
 		durationSeconds := end.Sub(start).Seconds()
-		durationHours := durationSeconds / 3600.0
+		durationHours := (durationSeconds / 3600.0) * activityScore
 
 		// Convert rate to major units
 		rate := float64(minorUnits) / 100.0

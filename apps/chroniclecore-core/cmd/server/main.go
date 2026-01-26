@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	AppVersion          = "1.8.10"
+	AppVersion          = "2.0.0"
 	DefaultPort         = "8080"
 	MLPort              = 8081
 	UpdateCheckInterval = 30 * time.Minute
@@ -100,6 +100,8 @@ func main() {
 	ruleHandler := api.NewRuleHandler(appStore)
 	systemHandler := api.NewSystemHandler()
 	blacklistHandler := api.NewBlacklistHandler(appStore)
+	eventHandler := api.NewEventHandler(appStore)
+	settingsHandler := api.NewSettingsHandler(appStore)
 
 	// ML handler (only if sidecar is running)
 	var mlHandler *api.MLHandler
@@ -243,6 +245,9 @@ func main() {
 	// Export endpoints
 	mux.HandleFunc("/api/v1/export/invoice-lines", exportHandler.ExportInvoiceLines)
 
+	// Extension event ingestion endpoint
+	mux.HandleFunc("/api/v1/events/ingest", eventHandler.IngestExtensionEvent)
+
 	// Rules management endpoints
 	mux.HandleFunc("/api/v1/rules", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
@@ -269,6 +274,18 @@ func main() {
 	mux.HandleFunc("/api/v1/system/check-update", func(w http.ResponseWriter, r *http.Request) {
 		systemHandler.CheckForUpdate(w, r, AppVersion)
 	})
+
+	// Settings endpoints
+	mux.HandleFunc("/api/v1/settings", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			settingsHandler.GetSettings(w, r)
+		} else if r.Method == http.MethodPut || r.Method == http.MethodPost {
+			settingsHandler.UpdateSettings(w, r)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/v1/settings/", settingsHandler.GetSingleSetting)
 
 	// Blacklist endpoints
 	mux.HandleFunc("/api/v1/blacklist", func(w http.ResponseWriter, r *http.Request) {

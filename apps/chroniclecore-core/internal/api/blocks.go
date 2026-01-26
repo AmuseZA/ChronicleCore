@@ -197,14 +197,20 @@ type BlockDTO struct {
 	ActivityScore *float64 `json:"activity_score,omitempty"` // Derived from metadata
 	CreatedAt     string   `json:"created_at"`
 	UpdatedAt     string   `json:"updated_at"`
+
+	// ML Suggestion (if pending)
+	HasMLSuggestion      bool    `json:"has_ml_suggestion,omitempty"`
+	MLSuggestedProfileID *int64  `json:"ml_suggested_profile_id,omitempty"`
+	MLConfidence         float64 `json:"ml_confidence,omitempty"`
 }
 
-// GroupedBlock represents blocks grouped by app+title context
+// GroupedBlock represents blocks grouped by app+title context+date
 type GroupedBlock struct {
 	GroupKey       string     `json:"group_key"` // Unique key for this group
 	PrimaryAppName string     `json:"primary_app_name"`
 	AppID          int64      `json:"app_id"`
 	TitleContext   string     `json:"title_context"` // Common title/context
+	Date           string     `json:"date"`          // Date of the group (YYYY-MM-DD)
 	TotalMinutes   float64    `json:"total_minutes"`
 	TotalHours     float64    `json:"total_hours"`
 	BlockCount     int        `json:"block_count"`
@@ -611,26 +617,18 @@ func (h *BlockHandler) ListGroupedBlocks(w http.ResponseWriter, r *http.Request)
 		if profileID.Valid {
 			pid := profileID.Int64
 			b.ProfileID = &pid
-		} else if mlPayload.Valid {
-			// Apply ML Suggestion if no profile assigned
+		}
+
+		// If there's a pending ML suggestion, include it as metadata (not as assignment)
+		if mlPayload.Valid {
 			var payload map[string]interface{}
 			if err := json.Unmarshal([]byte(mlPayload.String), &payload); err == nil {
 				if predictedID, ok := payload["predicted_profile_id"].(float64); ok {
+					b.HasMLSuggestion = true
 					pid := int64(predictedID)
-					b.ProfileID = &pid
-
-					// Use ML confidence (convert to string enum)
-					confVal := 0.0
+					b.MLSuggestedProfileID = &pid
 					if mlConfidence.Valid {
-						confVal = mlConfidence.Float64
-					}
-
-					if confVal >= 0.8 {
-						b.Confidence = "ML_HIGH"
-					} else if confVal >= 0.6 {
-						b.Confidence = "ML_MEDIUM"
-					} else {
-						b.Confidence = "ML_LOW"
+						b.MLConfidence = mlConfidence.Float64
 					}
 				}
 			}
@@ -669,9 +667,15 @@ func (h *BlockHandler) ListGroupedBlocks(w http.ResponseWriter, r *http.Request)
 			}
 		}
 
-		// Generate group key: app_name + extracted context from title
-		// For Xero, we extract company name from title like "White Cat Studios | Xero"
-		groupKey := generateGroupKey(b.PrimaryAppName, titleContext)
+		// Extract date from ts_start for grouping by day
+		blockDate := ""
+		if parsedTime, err := time.Parse(time.RFC3339, b.TsStart); err == nil {
+			blockDate = parsedTime.Format("2006-01-02")
+		}
+
+		// Generate group key: date + app_name + extracted context from title
+		// This ensures blocks from different days are in separate groups
+		groupKey := generateGroupKey(blockDate, b.PrimaryAppName, titleContext)
 
 		if group, exists := groupsMap[groupKey]; exists {
 			// Add to existing group
@@ -693,6 +697,7 @@ func (h *BlockHandler) ListGroupedBlocks(w http.ResponseWriter, r *http.Request)
 				PrimaryAppName: b.PrimaryAppName,
 				AppID:          appID,
 				TitleContext:   extractTitleContext(b.PrimaryAppName, titleContext),
+				Date:           blockDate,
 				TotalMinutes:   b.DurationMinutes,
 				TotalHours:     b.DurationHours,
 				BlockCount:     1,
@@ -739,11 +744,11 @@ func (h *BlockHandler) ListGroupedBlocks(w http.ResponseWriter, r *http.Request)
 	respondJSON(w, response, http.StatusOK)
 }
 
-// generateGroupKey creates a unique key for grouping blocks
-func generateGroupKey(appName, titleContext string) string {
+// generateGroupKey creates a unique key for grouping blocks by date, app, and context
+func generateGroupKey(date, appName, titleContext string) string {
 	// Extract meaningful context from title
 	context := extractTitleContext(appName, titleContext)
-	return appName + "|" + context
+	return date + "|" + appName + "|" + context
 }
 
 // extractTitleContext extracts the meaningful context from a window title
@@ -1047,6 +1052,13 @@ func (h *BlockHandler) DeleteBlock(w http.ResponseWriter, r *http.Request) {
 	h.recordDeletionForML(id)
 
 	if err := h.store.DeleteBlock(id); err != nil {
+		// If block not found, it may have been already deleted (e.g., duplicate request)
+		// Return success since the end result is the same - the block is gone
+		if err.Error() == "block not found" {
+			log.Printf("DeleteBlock: block %d already deleted (idempotent)", id)
+			respondJSON(w, map[string]bool{"success": true}, http.StatusOK)
+			return
+		}
 		log.Printf("API DeleteBlock failed: %v", err)
 		http.Error(w, "Failed to delete block", http.StatusInternalServerError)
 		return
@@ -1071,7 +1083,10 @@ func (h *BlockHandler) recordDeletionForML(blockID int64) {
 	`, blockID).Scan(&appName, &titleText, &domainText, &tsStart, &tsEnd)
 
 	if err != nil {
-		log.Printf("Could not fetch block %d for ML deletion learning: %v", blockID, err)
+		// Block not found is expected if already deleted - don't log as error
+		if err != sql.ErrNoRows {
+			log.Printf("Could not fetch block %d for ML deletion learning: %v", blockID, err)
+		}
 		return
 	}
 
