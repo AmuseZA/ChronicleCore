@@ -4,13 +4,54 @@
 
 ChronicleCore is a privacy-focused desktop application for tracking work activity, managing client profiles, and generating invoice-ready exports. Built on a 3-layer architecture (Directive → Orchestration → Execution), it prioritizes deterministic business logic over AI complexity.
 
-## Core Principles
+## 🚀 Features
 
+### Core Tracking
 - **Local-first**: All data stays on your machine. No cloud sync, no remote servers.
-- **Privacy by default**: Captures window titles only (no URLs, screenshots, or keystrokes).
-- **Deterministic logic**: Rules-based assignment with confidence scoring.
-- **Windows-only**: Single Go binary targeting Windows desktop.
-- **Localhost-only API**: Server binds to 127.0.0.1 only for security.
+- **Privacy by default**: Captures window titles and process names locally.
+- **Deep Activity Tracking**: (v2.0.0) Optional detailed content extraction for emails, chats, and documents.
+- **Idle Detection**: Smartly excludes idle time from billing calculations.
+
+### Intelligence
+- **ML Suggestions**: Learned profile suggestions based on your history.
+- **Smart Tagging**: Automatic categorization of browser-based apps (Gmail, Jira, etc.).
+- **Keyword Blacklisting**: Hide activities containing specific words (e.g., "Facebook").
+
+### Browser Extension (v2.0.0)
+- **Cross-browser support**: Chrome, Edge, Brave, Firefox.
+- **Detailed Insights**: Captures specific URLs, page titles, and generates human-readable activity descriptions (e.g., "Chatted with John on WhatsApp").
+- **Privacy**: Only sends data to the local ChronicleCore instance (127.0.0.1).
+
+## 📥 Installation
+
+1. Go to the [Releases](https://github.com/AmuseZA/ChronicleCore/releases) page.
+2. Download the latest installer: **ChronicleCore_Setup_v2.0.0.exe**.
+3. Run the installer (includes embedded Python and all dependencies).
+4. Launch via Desktop shortcut or Start Menu.
+
+## 📜 Version History
+
+### [v2.0.0] - 2026-01-27
+- **Major Release**
+- **Browser Extension**: Added cross-browser extension for detailed web activity tracking.
+- **Deep Activity Tracking**: Enhanced desktop tracking for detailed content (Outlook, VS Code, etc.).
+- **Settings API**: New endpoints for managing granular tracking preferences.
+
+### [v1.8.10]
+- **Critical Fix**: Resolved "Failed to scan profile" errors by correctly handling NULL profile names.
+
+### [v1.8.9]
+- **Hotfix**: Fixed silent migration failures for profile name columns.
+
+### [v1.8.8]
+- **Bug Fix**: Fixed issue where rejected ML suggestions would disappear from the review page.
+
+### [v1.8.1]
+- **ML Improvements**: Auto-predictions on stop, learning from deletions/rejections.
+- **UX**: "Delete Group" button, scroll preservation.
+
+### [v1.8.0]
+- **Features**: Keyword Blacklist, UI-integrated ML suggestions.
 
 ## Architecture
 
@@ -36,145 +77,20 @@ ChronicleCore is a privacy-focused desktop application for tracking work activit
 └─────────────────────────────────────────────┘
 ```
 
-### Technology Stack
-
-- **Backend**: Go 1.22 (single binary: `chroniclecore.exe`)
-- **Database**: SQLite with WAL mode
-- **Frontend**: Svelte + Vite + Tailwind (embedded in binary)
-- **Testing**: Python scripts for validation & fixture generation
-
-## Project Structure
-
-```
-ChronicleCore/
-├── spec/                      # Canonical specifications
-│   ├── schema.sql             # SQLite DDL (frozen contract)
-│   └── api_contract.yaml      # OpenAPI 3.0 spec
-├── directives/                # Layer 1: Feature SOPs
-│   ├── bootstrap_repo.md
-│   ├── windows_activity_capture.md
-│   └── ...
-├── execution/                 # Layer 3: Validation scripts
-│   ├── validate_schema.py
-│   ├── validate_api_contract.py
-│   └── generate_fixtures.py
-├── apps/
-│   ├── chroniclecore-core/    # Go backend
-│   │   ├── cmd/server/
-│   │   └── internal/
-│   └── chroniclecore-ui/      # Svelte frontend
-├── workflow/                  # Build plans & milestones
-└── .tmp/                      # Generated test data (gitignored)
-```
-
-## Phase 0: Bootstrap ✅ COMPLETE
-
-**Goal**: Establish foundational contracts and validation tooling.
-
-### Deliverables
-
-✅ **Canonical Schema** ([spec/schema.sql](spec/schema.sql))
-   - 14 tables (install, settings, clients, profiles, rules, events, blocks, audit)
-   - Foreign key constraints enforced
-   - Triggers for updated_at timestamps
-   - Views for duration calculations
-   - **Validated**: `python execution/validate_schema.py`
-
-✅ **API Contract** ([spec/api_contract.yaml](spec/api_contract.yaml))
-   - OpenAPI 3.0 specification
-   - System, Tracking, Blocks, Profiles, Exports endpoints
-   - Localhost-only (127.0.0.1) binding requirement documented
-   - **Validator**: `python execution/validate_api_contract.py`
-
-✅ **Validation Scripts**
-   - `validate_schema.py` - Confirms DDL correctness, foreign keys, objects
-   - `validate_api_contract.py` - Integration tests against live API
-   - `generate_fixtures.py` - Creates realistic 90-day test datasets
-
-✅ **Backend Scaffolding**
-   - Go module initialized ([apps/chroniclecore-core/go.mod](apps/chroniclecore-core/go.mod))
-   - HTTP server stub with localhost-only binding ([cmd/server/main.go](apps/chroniclecore-core/cmd/server/main.go))
-   - All API endpoints return stub responses (200 OK)
-   - CORS restricted to localhost origins
-
-### Quick Start (Phase 0 Validation)
-
-```bash
-# 1. Validate schema
-python execution/validate_schema.py
-
-# 2. Generate test fixtures (30 days)
-python execution/generate_fixtures.py --days 30
-
-# 3. Build and run server (requires Go 1.22+)
-cd apps/chroniclecore-core
-go run cmd/server/main.go
-
-# 4. Validate API contract (in separate terminal)
-python execution/validate_api_contract.py
-```
-
-## Next Steps: Phase 1
-
-Phase 1 will implement the core tracking loop:
-
-- Windows activity capture (Win32 API: GetForegroundWindow)
-- Idle detection
-- Raw event storage with 14-day retention
-- Block aggregation (5-minute rollup cadence)
-- Rules engine (process + title regex matching)
-- Profile CRUD
-- Deterministic description templates
-- Svelte dashboard (Today view)
-- CSV export with rounding/minimums
-
-See [workflow/v1_build_plan.md](workflow/v1_build_plan.md) for full roadmap.
-
 ## Security & Privacy
 
 ### Binding Policy
-- Server MUST bind to `127.0.0.1` only (enforced in code)
-- No remote access permitted
-- CORS restricted to localhost origins
+- Server MUST bind to `127.0.0.1` only (enforced in code).
+- No remote access permitted.
+- CORS restricted to localhost origins.
 
-### Data Capture Policy (MVP)
+### Data Capture Policy
 - ✅ Window titles (with redaction support)
 - ✅ Process names (e.g., EXCEL.EXE)
 - ✅ Idle detection
-- ❌ Full URLs (deferred to Phase 2 with browser extension)
+- ✅ Local-only Browser Extension (v2.0.0)
 - ❌ Screenshots (prohibited)
 - ❌ Keystrokes (prohibited)
-
-### Secrets Management
-- Sensitive config encrypted at rest via Windows DPAPI
-- No cloud API keys stored in desktop client
-- Browser extension uses per-install secret token
-
-### Retention
-- Raw events: 14 days (configurable)
-- Blocks: indefinite (aggregated, no sensitive detail)
-- Rollup job runs every 5 minutes to purge old raw events
-
-## Development Workflow
-
-### Self-Annealing Protocol
-
-When errors occur:
-1. Read the stack trace
-2. Fix deterministic tools/tests first
-3. Re-run validation scripts
-4. Update the relevant directive with failure mode + fix
-5. System gets stronger
-
-### Definition of Done (DoD)
-
-A change is "done" only if:
-- ✅ Build succeeds (Go binary compiles)
-- ✅ All validation scripts pass
-- ✅ API contract tests pass
-- ✅ Schema validation passes
-- ✅ Security checks pass (localhost binding, DPAPI, no sensitive capture)
-- ✅ Storage remains stable (retention + VACUUM tested)
 
 ## License
 
@@ -184,7 +100,3 @@ A change is "done" only if:
 
 ChronicleCore Project
 Built with the 3-layer DOE/SOP methodology.
-
----
-
-**Status**: Phase 0 Complete ✅ | Phase 1 Ready to Begin

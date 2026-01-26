@@ -1,7 +1,7 @@
 # ChronicleCore Product Roadmap
 
-**Current Version:** 1.8.1  
-**Last Updated:** January 2026
+**Current Version:** 2.0.0
+**Last Updated:** January 27, 2026
 
 ---
 
@@ -62,7 +62,16 @@ Transform ChronicleCore from a powerful time tracker into an **intelligent produ
 
 ---
 
-### v2.0.0 – Invoicing Integration (Q2 2026)
+### v2.0.0 – Deep Tracking & Extensions (Jan 2026) ✅
+**Theme:** Enhanced activity visibility
+
+| Feature | Description | Priority |
+|---------|-------------|----------|
+| **Browser Extension** | Cross-browser support for detailed tracking | Done |
+| **Deep Activity Tracking** | Content extraction for desktop apps | Done |
+| **Settings API** | Granular control over tracking preferences | Done |
+
+### v2.1.0 – Invoicing Integration (Q2 2026)
 **Theme:** Connect time tracking to billing
 
 | Feature | Description | Priority |
@@ -97,7 +106,7 @@ Transform ChronicleCore from a powerful time tracker into an **intelligent produ
 | **Calendar Sync** | Import Google/Outlook calendar events | High |
 | **Slack/Teams Notifications** | Daily summary notifications | Medium |
 | **Zapier/Make Webhooks** | Trigger automations on events | Medium |
-| **Browser Extension** | Quick timer start/stop from browser | Low |
+| **Browser Extension** | Quick timer start/stop from browser (Additional Features) | Low |
 
 ---
 

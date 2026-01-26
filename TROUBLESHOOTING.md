@@ -281,7 +281,7 @@ If all else fails:
    - Delete: `%LOCALAPPDATA%\ChronicleCore\` (optional, loses data)
 
 3. **Reinstall:**
-   - Run: `ChronicleCore_Setup_v1.0.0.exe`
+   - Run: `ChronicleCore_Setup_v2.0.0.exe`
    - Try different install location if permission issues
 
 ---
