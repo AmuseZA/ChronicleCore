@@ -44,6 +44,7 @@
         dateFormatted: string;
         blocks: Block[];
         totalMinutes: number;
+        billableMinutes: number;
     }
 
     let stats: ProfileStats | null = null;
@@ -52,11 +53,16 @@
     let processingBlockId: number | null = null;
     let expandedDates: Set<string> = new Set();
 
-    // View mode: 'lifetime' | 'monthly'
-    let viewMode: 'lifetime' | 'monthly' = 'monthly';
+    // View mode: 'lifetime' | 'monthly' | 'custom'
+    let viewMode: 'lifetime' | 'monthly' | 'custom' = 'monthly';
 
     // Month selector
     let selectedMonth: Date = new Date();
+
+    // Custom date range
+    let customStartDate: string = format(new Date(), 'yyyy-MM-dd');
+    let customEndDate: string = format(new Date(), 'yyyy-MM-dd');
+
 
     $: profileId = $page.params.id;
 
@@ -74,17 +80,21 @@
                     date,
                     dateFormatted: format(parseISO(block.ts_start), "EEEE, MMMM d, yyyy"),
                     blocks: [],
-                    totalMinutes: 0
+                    totalMinutes: 0,
+                    billableMinutes: 0
                 });
             }
 
             const group = groups.get(date)!;
             group.blocks.push(block);
             group.totalMinutes += block.duration_minutes;
+            if (block.billable) {
+                group.billableMinutes += block.duration_minutes;
+            }
         }
 
-        // Sort by date descending
-        return Array.from(groups.values()).sort((a, b) => b.date.localeCompare(a.date));
+        // Sort by date ascending for reports (chronological order)
+        return Array.from(groups.values()).sort((a, b) => a.date.localeCompare(b.date));
     }
 
     async function loadStats() {
@@ -99,14 +109,26 @@
                 const start = format(startOfMonth(selectedMonth), 'yyyy-MM-dd');
                 const end = format(endOfMonth(selectedMonth), 'yyyy-MM-dd');
                 url += `&start_date=${start}&end_date=${end}`;
+            } else if (viewMode === 'custom') {
+                url += `&start_date=${customStartDate}&end_date=${customEndDate}`;
             }
 
             stats = await fetchApi(url);
 
-            // Auto-expand the first date group
+            // Auto-expand all date groups in custom view for report generation
+            expandedDates = new Set();
             if (stats?.recent_blocks && stats.recent_blocks.length > 0) {
-                const firstDate = format(parseISO(stats.recent_blocks[0].ts_start), "yyyy-MM-dd");
-                expandedDates.add(firstDate);
+                if (viewMode === 'custom') {
+                    // Expand all dates for custom range (report view)
+                    for (const block of stats.recent_blocks) {
+                        const date = format(parseISO(block.ts_start), "yyyy-MM-dd");
+                        expandedDates.add(date);
+                    }
+                } else {
+                    // Just expand first date for other views
+                    const firstDate = format(parseISO(stats.recent_blocks[0].ts_start), "yyyy-MM-dd");
+                    expandedDates.add(firstDate);
+                }
                 expandedDates = expandedDates;
             }
         } catch (e: any) {
@@ -142,9 +164,96 @@
         loadStats();
     }
 
-    function setViewMode(mode: 'lifetime' | 'monthly') {
+    function setViewMode(mode: 'lifetime' | 'monthly' | 'custom') {
         viewMode = mode;
-        loadStats();
+        if (mode !== 'custom') {
+            loadStats();
+        }
+    }
+
+    function applyCustomRange() {
+        if (customStartDate && customEndDate) {
+            loadStats();
+        }
+    }
+
+    function copyReportToClipboard() {
+        if (!stats) return;
+
+        const ratePerHour = stats.rate_amount;
+        const currency = stats.currency_code;
+        let report = `TIMESHEET REPORT\n`;
+        report += `================\n\n`;
+        report += `Client: ${stats.client_name}\n`;
+        if (stats.project_name) report += `Project: ${stats.project_name}\n`;
+        report += `Service: ${stats.service_name}\n`;
+        report += `Rate: ${formatCurrency(ratePerHour, currency)}/hr\n`;
+        report += `Period: ${format(parseISO(customStartDate), 'MMMM d, yyyy')} - ${format(parseISO(customEndDate), 'MMMM d, yyyy')}\n\n`;
+        report += `DAILY BREAKDOWN\n`;
+        report += `---------------\n\n`;
+
+        let grandTotalMinutes = 0;
+        let grandTotalBillable = 0;
+
+        for (const group of groupedBlocks) {
+            const hours = group.billableMinutes / 60;
+            const amount = hours * ratePerHour;
+            grandTotalMinutes += group.billableMinutes;
+            grandTotalBillable += amount;
+
+            report += `${group.dateFormatted}\n`;
+            report += `  Time: ${hours.toFixed(2)} hours\n`;
+            report += `  Amount: ${formatCurrency(amount, currency)}\n`;
+
+            // List tasks for this day
+            const taskSummary = new Map<string, number>();
+            for (const block of group.blocks) {
+                if (block.billable) {
+                    const task = block.title_summary || block.primary_app_name;
+                    taskSummary.set(task, (taskSummary.get(task) || 0) + block.duration_minutes);
+                }
+            }
+            for (const [task, mins] of taskSummary) {
+                report += `    - ${task} (${(mins / 60).toFixed(1)}h)\n`;
+            }
+            report += `\n`;
+        }
+
+        report += `TOTALS\n`;
+        report += `------\n`;
+        report += `Total Hours: ${(grandTotalMinutes / 60).toFixed(2)}\n`;
+        report += `Total Amount: ${formatCurrency(grandTotalBillable, currency)}\n`;
+
+        navigator.clipboard.writeText(report);
+        alert('Report copied to clipboard!');
+    }
+
+    function downloadReportCSV() {
+        if (!stats) return;
+
+        const ratePerHour = stats.rate_amount;
+        const currency = stats.currency_code;
+
+        let csv = 'Date,Task,Duration (hours),Rate,Amount,Currency\n';
+
+        for (const group of groupedBlocks) {
+            for (const block of group.blocks) {
+                if (block.billable) {
+                    const hours = block.duration_minutes / 60;
+                    const amount = hours * ratePerHour;
+                    const task = (block.title_summary || block.primary_app_name).replace(/"/g, '""');
+                    csv += `"${group.date}","${task}",${hours.toFixed(4)},${ratePerHour},${amount.toFixed(2)},${currency}\n`;
+                }
+            }
+        }
+
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `timesheet_${stats.client_name.replace(/\s+/g, '_')}_${customStartDate}_${customEndDate}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
     }
 
     function toggleDateGroup(date: string) {
@@ -226,7 +335,7 @@
     </div>
 
     {#if loading}
-        <div class="bg-white rounded-xl border border-slate-200 p-12 text-center text-slate-500">
+        <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-12 text-center text-slate-500 dark:text-slate-400">
             Loading profile details...
         </div>
     {:else if error}
@@ -235,7 +344,7 @@
         </div>
     {:else if stats}
         <!-- Profile Header Card -->
-        <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+        <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-6">
             <div class="flex items-start justify-between">
                 <div class="flex items-center gap-4">
                     <div class="w-14 h-14 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-lg">
@@ -266,6 +375,14 @@
                             : 'text-slate-600 hover:text-slate-900'}"
                     >
                         Monthly
+                    </button>
+                    <button
+                        on:click={() => setViewMode('custom')}
+                        class="px-4 py-2 text-sm font-medium rounded-md transition-colors {viewMode === 'custom'
+                            ? 'bg-white text-slate-900 shadow-sm'
+                            : 'text-slate-600 hover:text-slate-900'}"
+                    >
+                        Custom Range
                     </button>
                     <button
                         on:click={() => setViewMode('lifetime')}
@@ -310,12 +427,67 @@
                     </button>
                 </div>
             {/if}
+
+            <!-- Custom Date Range Selector -->
+            {#if viewMode === 'custom'}
+                <div class="mt-6 pt-6 border-t border-slate-100">
+                    <div class="flex flex-wrap items-end gap-4">
+                        <div class="flex-1 min-w-[200px]">
+                            <label class="block text-xs font-medium text-slate-500 mb-1">Start Date</label>
+                            <input
+                                type="date"
+                                bind:value={customStartDate}
+                                class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
+                        </div>
+                        <div class="flex-1 min-w-[200px]">
+                            <label class="block text-xs font-medium text-slate-500 mb-1">End Date</label>
+                            <input
+                                type="date"
+                                bind:value={customEndDate}
+                                class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
+                        </div>
+                        <button
+                            on:click={applyCustomRange}
+                            class="px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                            Apply Range
+                        </button>
+                    </div>
+
+                    <!-- Report Actions (show after data is loaded) -->
+                    {#if stats && groupedBlocks.length > 0}
+                        <div class="mt-4 pt-4 border-t border-slate-100 flex items-center gap-3">
+                            <span class="text-sm text-slate-500">Export Report:</span>
+                            <button
+                                on:click={copyReportToClipboard}
+                                class="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-200 transition-colors"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                                </svg>
+                                Copy as Text
+                            </button>
+                            <button
+                                on:click={downloadReportCSV}
+                                class="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                Download CSV
+                            </button>
+                        </div>
+                    {/if}
+                </div>
+            {/if}
         </div>
 
         <!-- Stats Cards -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <!-- Total Time -->
-            <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+            <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5">
                 <div class="text-xs font-medium text-slate-500 uppercase tracking-wide">Total Time</div>
                 <div class="mt-2 text-2xl font-bold text-slate-900 tabular-nums">
                     {stats.total_hours.toFixed(1)}h
@@ -326,7 +498,7 @@
             </div>
 
             <!-- Billable Time -->
-            <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+            <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5">
                 <div class="text-xs font-medium text-slate-500 uppercase tracking-wide">Billable Time</div>
                 <div class="mt-2 text-2xl font-bold text-slate-900 tabular-nums">
                     {stats.billable_hours.toFixed(1)}h
@@ -337,7 +509,7 @@
             </div>
 
             <!-- Estimated Billable -->
-            <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+            <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5">
                 <div class="text-xs font-medium text-slate-500 uppercase tracking-wide">Est. Billable</div>
                 <div class="mt-2 text-2xl font-bold text-green-600 tabular-nums">
                     {formatCurrency(stats.estimated_billable, stats.currency_code)}
@@ -348,7 +520,7 @@
             </div>
 
             <!-- Locked / Invoiced -->
-            <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+            <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5">
                 <div class="text-xs font-medium text-slate-500 uppercase tracking-wide">Locked (Ready)</div>
                 <div class="mt-2 text-2xl font-bold text-slate-900 tabular-nums">
                     {stats.locked_hours.toFixed(1)}h
@@ -363,7 +535,13 @@
         <div class="space-y-4">
             <div class="flex items-center justify-between">
                 <h2 class="text-lg font-semibold text-slate-900">
-                    {viewMode === 'lifetime' ? 'Recent Activity' : `Activity for ${format(selectedMonth, 'MMMM yyyy')}`}
+                    {#if viewMode === 'lifetime'}
+                        Recent Activity
+                    {:else if viewMode === 'custom'}
+                        Activity: {format(parseISO(customStartDate), 'MMM d')} - {format(parseISO(customEndDate), 'MMM d, yyyy')}
+                    {:else}
+                        Activity for {format(selectedMonth, 'MMMM yyyy')}
+                    {/if}
                 </h2>
                 <span class="text-sm text-slate-500">
                     {groupedBlocks.length} day{groupedBlocks.length !== 1 ? 's' : ''} with activity
@@ -372,7 +550,7 @@
 
             {#if groupedBlocks.length > 0}
                 {#each groupedBlocks as dateGroup (dateGroup.date)}
-                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
                         <!-- Date Header -->
                         <button
                             on:click={() => toggleDateGroup(dateGroup.date)}
@@ -390,9 +568,16 @@
                                 </span>
                             </div>
                             <div class="flex items-center gap-4">
-                                <span class="font-medium text-slate-700 tabular-nums">
-                                    {(dateGroup.totalMinutes / 60).toFixed(1)}h
-                                </span>
+                                <div class="text-right">
+                                    <span class="font-medium text-slate-700 tabular-nums">
+                                        {(dateGroup.billableMinutes / 60).toFixed(1)}h
+                                    </span>
+                                    {#if viewMode === 'custom' && stats}
+                                        <span class="ml-2 text-sm text-green-600 font-medium tabular-nums">
+                                            {formatCurrency((dateGroup.billableMinutes / 60) * stats.rate_amount, stats.currency_code)}
+                                        </span>
+                                    {/if}
+                                </div>
                                 <svg
                                     class="w-5 h-5 text-slate-400 transition-transform {expandedDates.has(dateGroup.date) ? 'rotate-180' : ''}"
                                     fill="none" stroke="currentColor" viewBox="0 0 24 24"
@@ -480,7 +665,7 @@
                     </div>
                 {/each}
             {:else}
-                <div class="bg-white rounded-xl border border-slate-200 p-12 text-center">
+                <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-12 text-center">
                     <div class="w-12 h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-3">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />

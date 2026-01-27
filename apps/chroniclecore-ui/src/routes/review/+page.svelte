@@ -403,13 +403,13 @@
 
     {#if loading}
         <div
-            class="bg-white rounded-xl border border-slate-200 p-12 text-center text-slate-500"
+            class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-12 text-center text-slate-500 dark:text-slate-400"
         >
             Loading...
         </div>
     {:else if groups.length === 0}
         <div
-            class="bg-white rounded-xl border border-slate-200 p-12 text-center"
+            class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-12 text-center"
         >
             <div
                 class="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-3"
@@ -447,7 +447,7 @@
                     <div class="grid grid-cols-1 gap-4">
                         {#each unassignedGroups as group (group.group_key)}
                             <div
-                                class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow"
+                                class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden hover:shadow-md transition-shadow"
                             >
                                 <div class="p-5">
                                     <div
@@ -774,7 +774,7 @@
                     <div class="grid grid-cols-1 gap-4">
                         {#each [...mediumConfidenceGroups, ...lowConfidenceGroups] as group}
                             <div
-                                class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow"
+                                class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden hover:shadow-md transition-shadow"
                             >
                                 <div class="p-5">
                                     <div
@@ -1004,7 +1004,7 @@
         on:click={closeBlacklistModal}
     >
         <div
-            class="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4 overflow-hidden"
+            class="bg-white dark:bg-slate-800 rounded-2xl shadow-xl max-w-md w-full mx-4 overflow-hidden"
             on:click|stopPropagation
         >
             <div class="px-6 py-4 border-b border-slate-100 bg-slate-50">

@@ -212,13 +212,13 @@
 
     {#if loading}
         <div
-            class="bg-white rounded-xl border border-slate-200 p-12 text-center text-slate-500"
+            class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-12 text-center text-slate-500 dark:text-slate-400"
         >
             Loading suggestions...
         </div>
     {:else if suggestions.length === 0}
         <div
-            class="bg-white rounded-xl border border-slate-200 p-12 text-center"
+            class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-12 text-center"
         >
             <div
                 class="w-12 h-12 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center mx-auto mb-3"
@@ -268,7 +268,7 @@
                     <div class="grid grid-cols-1 gap-4">
                         {#each highConfidence as suggestion (suggestion.suggestion_id)}
                             <div
-                                class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 hover:shadow-md transition-shadow"
+                                class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5 hover:shadow-md transition-shadow"
                             >
                                 <div
                                     class="flex justify-between items-start gap-4"
@@ -387,7 +387,7 @@
                     <div class="grid grid-cols-1 gap-4">
                         {#each mediumConfidence as suggestion (suggestion.suggestion_id)}
                             <div
-                                class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 hover:shadow-md transition-shadow"
+                                class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5 hover:shadow-md transition-shadow"
                             >
                                 <div
                                     class="flex justify-between items-start gap-4"
@@ -506,7 +506,7 @@
                     <div class="grid grid-cols-1 gap-4">
                         {#each lowConfidence as suggestion (suggestion.suggestion_id)}
                             <div
-                                class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 hover:shadow-md transition-shadow"
+                                class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5 hover:shadow-md transition-shadow"
                             >
                                 <div
                                     class="flex justify-between items-start gap-4"
@@ -625,7 +625,7 @@
                     <div class="grid grid-cols-1 gap-4">
                         {#each deleteSuggestions as suggestion (suggestion.suggestion_id)}
                             <div
-                                class="bg-white rounded-xl border border-red-200 shadow-sm p-5 hover:shadow-md transition-shadow"
+                                class="bg-white dark:bg-slate-800 rounded-xl border border-red-200 dark:border-red-800 shadow-sm p-5 hover:shadow-md transition-shadow"
                             >
                                 <div
                                     class="flex justify-between items-start gap-4"

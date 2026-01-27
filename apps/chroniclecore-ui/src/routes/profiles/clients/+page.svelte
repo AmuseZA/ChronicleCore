@@ -37,7 +37,7 @@
         <span class="text-slate-900 font-medium">Clients</span>
     </div>
 
-    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 mb-8">
+    <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-6 mb-8">
         <h2 class="text-lg font-semibold text-slate-900 mb-4">
             Add New Client
         </h2>
@@ -60,7 +60,7 @@
     </div>
 
     <div
-        class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden"
+        class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden"
     >
         <table class="w-full text-left">
             <thead class="bg-slate-50 border-b border-slate-200">

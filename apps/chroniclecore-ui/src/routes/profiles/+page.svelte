@@ -114,7 +114,7 @@
     {/if}
 
     <div
-        class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
+        class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden"
     >
         {#if loading}
             <div class="p-12 text-center text-slate-500 animate-pulse">

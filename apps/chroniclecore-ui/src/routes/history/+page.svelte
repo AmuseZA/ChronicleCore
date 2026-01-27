@@ -259,7 +259,7 @@
 
     <!-- Summary Cards -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+        <div class="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
             <h3
                 class="text-xs font-semibold text-slate-500 uppercase tracking-wide"
             >
@@ -272,7 +272,7 @@
                 <span class="text-sm text-slate-500">hrs</span>
             </div>
         </div>
-        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+        <div class="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
             <h3
                 class="text-xs font-semibold text-slate-500 uppercase tracking-wide"
             >
@@ -286,7 +286,7 @@
             </div>
         </div>
         <div
-            class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-center"
+            class="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-center"
         >
             <button
                 on:click={exportCsv}
@@ -310,7 +310,7 @@
     </div>
 
     <!-- Content -->
-    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
         <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
             <h2 class="text-lg font-bold text-slate-900">Activity Groups</h2>
             <span class="text-sm text-slate-500">{activityGroups.length} groups</span>

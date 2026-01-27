@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -24,7 +25,7 @@ import (
 )
 
 const (
-	AppVersion          = "2.1.0"
+	AppVersion          = "2.2.0"
 	DefaultPort         = "8080"
 	MLPort              = 8081
 	UpdateCheckInterval = 30 * time.Minute
@@ -649,10 +650,70 @@ func checkForUpdateBackground() {
 
 	latestVersion := strings.TrimPrefix(release.TagName, "v")
 
-	// Simple version comparison
-	if latestVersion != AppVersion && latestVersion > AppVersion {
+	// Use semantic version comparison
+	comparison := compareVersions(AppVersion, latestVersion)
+	switch comparison {
+	case -1:
+		// Local is older - update available
 		log.Printf("🔔 Update available: v%s -> v%s (check Settings to download)", AppVersion, latestVersion)
+	case 1:
+		// Local is newer - development/pre-release build
+		log.Printf("📦 Running development build (v%s > latest release v%s)", AppVersion, latestVersion)
+	// case 0: versions are equal, no action needed
 	}
+}
+
+// compareVersions compares two semantic version strings
+// Returns: -1 if v1 < v2, 0 if v1 == v2, 1 if v1 > v2
+func compareVersions(v1, v2 string) int {
+	// Parse version components
+	parts1 := parseVersion(v1)
+	parts2 := parseVersion(v2)
+
+	// Compare each component (major, minor, patch)
+	for i := 0; i < 3; i++ {
+		p1, p2 := 0, 0
+		if i < len(parts1) {
+			p1 = parts1[i]
+		}
+		if i < len(parts2) {
+			p2 = parts2[i]
+		}
+
+		if p1 < p2 {
+			return -1
+		}
+		if p1 > p2 {
+			return 1
+		}
+	}
+
+	return 0 // Equal
+}
+
+// parseVersion extracts numeric components from a version string like "2.1.0"
+func parseVersion(v string) []int {
+	parts := strings.Split(v, ".")
+	result := make([]int, 0, len(parts))
+
+	for _, p := range parts {
+		// Extract only numeric portion (handle "2.1.0-beta" etc.)
+		numStr := ""
+		for _, c := range p {
+			if c >= '0' && c <= '9' {
+				numStr += string(c)
+			} else {
+				break
+			}
+		}
+		if numStr != "" {
+			if num, err := strconv.Atoi(numStr); err == nil {
+				result = append(result, num)
+			}
+		}
+	}
+
+	return result
 }
 
 // triggerMLPredictions calls the ML sidecar to generate predictions for unassigned blocks

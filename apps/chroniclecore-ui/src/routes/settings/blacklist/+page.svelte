@@ -137,7 +137,7 @@
     </div>
 
     <!-- Add New -->
-    <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+    <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
         <h2 class="text-lg font-semibold text-slate-900 mb-4">
             Add Application
         </h2>
@@ -166,7 +166,7 @@
 
     <!-- List -->
     <div
-        class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
+        class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden"
     >
         <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
             <h2 class="text-lg font-semibold text-slate-900">
@@ -239,7 +239,7 @@
 
     <!-- Keyword Blacklist Section -->
     <div
-        class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm mt-8"
+        class="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm mt-8"
     >
         <h2 class="text-lg font-semibold text-slate-900 mb-4">Add Keyword</h2>
         <p class="text-slate-500 text-sm mb-4">
@@ -270,7 +270,7 @@
 
     <!-- Keyword List -->
     <div
-        class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
+        class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden"
     >
         <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
             <h2 class="text-lg font-semibold text-slate-900">

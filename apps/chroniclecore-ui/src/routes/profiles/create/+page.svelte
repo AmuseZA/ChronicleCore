@@ -38,7 +38,7 @@
 </script>
 
 <div class="max-w-xl mx-auto mt-12">
-    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-8">
+    <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-8">
         <h1 class="text-2xl font-bold text-slate-900 mb-6">
             Create New Profile
         </h1>
