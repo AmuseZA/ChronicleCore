@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	AppVersion          = "2.3.0"
+	AppVersion          = "2.4.0"
 	DefaultPort         = "8080"
 	MLPort              = 8081
 	UpdateCheckInterval = 30 * time.Minute

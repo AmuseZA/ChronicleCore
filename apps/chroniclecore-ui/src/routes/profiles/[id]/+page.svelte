@@ -54,6 +54,17 @@
         billableMinutes: number;
     }
 
+    interface SubGroup {
+        key: string;
+        displayName: string;
+        blocks: Block[];
+        totalMinutes: number;
+        billableMinutes: number;
+    }
+
+    // Expanded state for sub-groups within dates
+    let expandedSubGroups: Set<string> = new Set();
+
     let stats: ProfileStats | null = null;
     let loading = true;
     let error: string | null = null;
@@ -74,6 +85,68 @@
 
     // Group blocks by date
     $: groupedBlocks = groupBlocksByDate(stats?.recent_blocks || []);
+
+    // Extract a grouping key from block title/app for sub-grouping
+    function getSubGroupKey(block: Block): string {
+        const title = block.title_summary || block.primary_app_name;
+
+        // Extract meaningful patterns from title
+        // e.g., "Outlook - accounts@company.com" -> "Outlook - accounts@"
+        // e.g., "Chrome - admin@website.com" -> "Chrome - admin@"
+
+        // Pattern: Look for email-like patterns (user@) or app - prefix patterns
+        const emailMatch = title.match(/^(.+?\s*-\s*)([a-zA-Z0-9._-]+@)/);
+        if (emailMatch) {
+            return `${emailMatch[1]}${emailMatch[2]}`;
+        }
+
+        // Pattern: App Name - Category/Context
+        const appContextMatch = title.match(/^([^-]+\s*-\s*[^-]+)/);
+        if (appContextMatch) {
+            return appContextMatch[1].trim();
+        }
+
+        // Default: group by app name
+        return block.primary_app_name;
+    }
+
+    function groupBlocksIntoSubGroups(blocks: Block[]): SubGroup[] {
+        const groups = new Map<string, SubGroup>();
+
+        for (const block of blocks) {
+            const key = getSubGroupKey(block);
+
+            if (!groups.has(key)) {
+                groups.set(key, {
+                    key,
+                    displayName: key,
+                    blocks: [],
+                    totalMinutes: 0,
+                    billableMinutes: 0,
+                });
+            }
+
+            const group = groups.get(key)!;
+            group.blocks.push(block);
+            group.totalMinutes += block.duration_minutes;
+            if (block.billable) {
+                group.billableMinutes += block.duration_minutes;
+            }
+        }
+
+        // Sort sub-groups by billable time descending
+        return Array.from(groups.values()).sort((a, b) => b.billableMinutes - a.billableMinutes);
+    }
+
+    function toggleSubGroup(dateKey: string, subGroupKey: string) {
+        const fullKey = `${dateKey}:${subGroupKey}`;
+        if (expandedSubGroups.has(fullKey)) {
+            expandedSubGroups.delete(fullKey);
+        } else {
+            expandedSubGroups.add(fullKey);
+        }
+        expandedSubGroups = expandedSubGroups;
+    }
 
     function groupBlocksByDate(blocks: Block[]): GroupedByDate[] {
         const groups = new Map<string, GroupedByDate>();
@@ -202,19 +275,15 @@
             report += `  Time: ${hours.toFixed(2)} hours\n`;
             report += `  Amount: ${formatCurrency(amount, currency)}\n`;
 
-            // List tasks for this day
-            const taskSummary = new Map<string, number>();
-            for (const block of group.blocks) {
-                if (block.billable) {
-                    const task = block.title_summary || block.primary_app_name;
-                    taskSummary.set(
-                        task,
-                        (taskSummary.get(task) || 0) + block.duration_minutes,
-                    );
+            // Group tasks by sub-group for easier invoicing
+            const subGroups = groupBlocksIntoSubGroups(group.blocks);
+            for (const subGroup of subGroups) {
+                if (subGroup.billableMinutes > 0) {
+                    const subHours = subGroup.billableMinutes / 60;
+                    const subAmount = subHours * ratePerHour;
+                    report += `    ${subGroup.displayName}\n`;
+                    report += `      ${subHours.toFixed(2)}h - ${formatCurrency(subAmount, currency)}\n`;
                 }
-            }
-            for (const [task, mins] of taskSummary) {
-                report += `    - ${task} (${(mins / 60).toFixed(1)}h)\n`;
             }
             report += `\n`;
         }
@@ -234,17 +303,18 @@
         const ratePerHour = stats.rate_amount;
         const currency = stats.currency_code;
 
-        let csv = "Date,Task,Duration (hours),Rate,Amount,Currency\n";
+        let csv = "Date,Category,Task,Duration (hours),Rate,Amount,Currency\n";
 
         for (const group of groupedBlocks) {
             for (const block of group.blocks) {
                 if (block.billable) {
                     const hours = block.duration_minutes / 60;
                     const amount = hours * ratePerHour;
+                    const category = getSubGroupKey(block).replace(/"/g, '""');
                     const task = (
                         block.title_summary || block.primary_app_name
                     ).replace(/"/g, '""');
-                    csv += `"${group.date}","${task}",${hours.toFixed(4)},${ratePerHour},${amount.toFixed(2)},${currency}\n`;
+                    csv += `"${group.date}","${category}","${task}",${hours.toFixed(4)},${ratePerHour},${amount.toFixed(2)},${currency}\n`;
                 }
             }
         }
@@ -502,25 +572,61 @@
                     <div class="flex flex-wrap items-end gap-4">
                         <div class="flex-1 min-w-[200px]">
                             <label
+                                for="custom-start-date"
                                 class="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1"
                                 >Start Date</label
                             >
-                            <input
-                                type="date"
-                                bind:value={customStartDate}
-                                class="w-full px-3 py-2 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            />
+                            <div
+                                class="relative cursor-pointer"
+                                on:click={(e) => {
+                                    const input = e.currentTarget.querySelector('input');
+                                    if (input) input.showPicker?.();
+                                }}
+                                on:keydown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                        const input = e.currentTarget.querySelector('input');
+                                        if (input) input.showPicker?.();
+                                    }
+                                }}
+                                role="button"
+                                tabindex="-1"
+                            >
+                                <input
+                                    id="custom-start-date"
+                                    type="date"
+                                    bind:value={customStartDate}
+                                    class="w-full px-3 py-2 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent cursor-pointer"
+                                />
+                            </div>
                         </div>
                         <div class="flex-1 min-w-[200px]">
                             <label
+                                for="custom-end-date"
                                 class="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1"
                                 >End Date</label
                             >
-                            <input
-                                type="date"
-                                bind:value={customEndDate}
-                                class="w-full px-3 py-2 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            />
+                            <div
+                                class="relative cursor-pointer"
+                                on:click={(e) => {
+                                    const input = e.currentTarget.querySelector('input');
+                                    if (input) input.showPicker?.();
+                                }}
+                                on:keydown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                        const input = e.currentTarget.querySelector('input');
+                                        if (input) input.showPicker?.();
+                                    }
+                                }}
+                                role="button"
+                                tabindex="-1"
+                            >
+                                <input
+                                    id="custom-end-date"
+                                    type="date"
+                                    bind:value={customEndDate}
+                                    class="w-full px-3 py-2 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent cursor-pointer"
+                                />
+                            </div>
                         </div>
                         <button
                             on:click={applyCustomRange}
@@ -718,12 +824,12 @@
                                             d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
                                         />
                                     </svg>
-                                    <span class="font-semibold text-slate-900"
+                                    <span class="font-semibold text-slate-900 dark:text-slate-100"
                                         >{dateGroup.dateFormatted}</span
                                     >
                                 </div>
                                 <span
-                                    class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs font-medium"
+                                    class="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-600 text-slate-600 dark:text-slate-300 text-xs font-medium"
                                 >
                                     {dateGroup.blocks.length} block{dateGroup
                                         .blocks.length !== 1
@@ -734,13 +840,13 @@
                             <div class="flex items-center gap-4">
                                 <div class="text-right">
                                     <span
-                                        class="font-medium text-slate-700 tabular-nums"
+                                        class="font-medium text-slate-700 dark:text-slate-300 tabular-nums"
                                     >
                                         {(
                                             dateGroup.billableMinutes / 60
                                         ).toFixed(1)}h
                                     </span>
-                                    {#if viewMode === "custom" && stats}
+                                    {#if stats}
                                         <span
                                             class="ml-2 text-sm text-green-600 font-medium tabular-nums"
                                         >
@@ -778,120 +884,20 @@
                             <div
                                 class="border-t border-slate-100 dark:border-slate-700"
                             >
-                                <div
-                                    class="divide-y divide-slate-100 dark:divide-slate-700"
-                                >
-                                    {#each dateGroup.blocks as block (block.block_id)}
-                                        <div
-                                            class="px-6 py-4 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex items-start gap-4"
-                                        >
-                                            <!-- Time Column -->
-                                            <div class="w-24 shrink-0">
-                                                <div
-                                                    class="text-sm font-medium text-slate-900 dark:text-slate-100"
+                                <!-- Sub-groups for custom view -->
+                                {#if viewMode === "custom"}
+                                    {@const subGroups = groupBlocksIntoSubGroups(dateGroup.blocks)}
+                                    <div class="divide-y divide-slate-100 dark:divide-slate-700">
+                                        {#each subGroups as subGroup (subGroup.key)}
+                                            <!-- Sub-group header -->
+                                            <div>
+                                                <button
+                                                    on:click={() => toggleSubGroup(dateGroup.date, subGroup.key)}
+                                                    class="w-full px-6 py-3 flex items-center justify-between bg-slate-50 dark:bg-slate-750 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                                                 >
-                                                    {format(
-                                                        parseISO(
-                                                            block.ts_start,
-                                                        ),
-                                                        "HH:mm",
-                                                    )}
-                                                </div>
-                                                <div
-                                                    class="text-xs text-slate-500 dark:text-slate-400"
-                                                >
-                                                    to {format(
-                                                        parseISO(block.ts_end),
-                                                        "HH:mm",
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            <!-- Activity Info -->
-                                            <div class="flex-1 min-w-0">
-                                                <div
-                                                    class="text-sm text-slate-900 dark:text-slate-100 break-words"
-                                                >
-                                                    {block.title_summary ||
-                                                        block.primary_app_name}
-                                                </div>
-                                                <div
-                                                    class="flex items-center gap-2 mt-1"
-                                                >
-                                                    <span
-                                                        class="text-xs text-slate-500 dark:text-slate-400"
-                                                        >{block.primary_app_name}</span
-                                                    >
-                                                    <span
-                                                        class="text-slate-300 dark:text-slate-600"
-                                                        >•</span
-                                                    >
-                                                    <span
-                                                        class="text-xs font-medium text-slate-600 dark:text-slate-400 tabular-nums"
-                                                        >{block.duration_minutes.toFixed(
-                                                            0,
-                                                        )} min</span
-                                                    >
-                                                </div>
-                                            </div>
-
-                                            <!-- Status Badges -->
-                                            <div
-                                                class="flex items-center gap-2 shrink-0"
-                                            >
-                                                <span
-                                                    class="text-xs px-2 py-1 rounded-md border {getConfidenceStyle(
-                                                        block.confidence,
-                                                    )}"
-                                                >
-                                                    {block.confidence}
-                                                </span>
-                                                {#if block.locked}
-                                                    <span
-                                                        class="text-xs px-2 py-1 rounded-md bg-green-50 text-green-700 border border-green-200"
-                                                    >
-                                                        Locked
-                                                    </span>
-                                                {/if}
-                                                {#if !block.billable}
-                                                    <span
-                                                        class="text-xs px-2 py-1 rounded-md bg-slate-50 text-slate-600 border border-slate-200"
-                                                    >
-                                                        Non-billable
-                                                    </span>
-                                                {/if}
-                                            </div>
-
-                                            <!-- Actions -->
-                                            <div
-                                                class="flex items-center gap-2 shrink-0"
-                                            >
-                                                {#if !block.locked}
-                                                    <div class="w-36">
-                                                        <ProfileSelector
-                                                            placeholder="Change..."
-                                                            value={stats?.profile_id}
-                                                            disabled={processingBlockId ===
-                                                                block.block_id}
-                                                            on:change={(e) =>
-                                                                reassignBlock(
-                                                                    block.block_id,
-                                                                    e.detail,
-                                                                )}
-                                                        />
-                                                    </div>
-                                                    <button
-                                                        on:click={() =>
-                                                            unassignBlock(
-                                                                block.block_id,
-                                                            )}
-                                                        disabled={processingBlockId ===
-                                                            block.block_id}
-                                                        class="text-xs text-slate-400 hover:text-red-600 transition-colors disabled:opacity-50"
-                                                        title="Remove from this profile"
-                                                    >
+                                                    <div class="flex items-center gap-3">
                                                         <svg
-                                                            class="w-4 h-4"
+                                                            class="w-4 h-4 text-slate-400 transition-transform {expandedSubGroups.has(`${dateGroup.date}:${subGroup.key}`) ? 'rotate-90' : ''}"
                                                             fill="none"
                                                             stroke="currentColor"
                                                             viewBox="0 0 24 24"
@@ -900,20 +906,248 @@
                                                                 stroke-linecap="round"
                                                                 stroke-linejoin="round"
                                                                 stroke-width="2"
-                                                                d="M6 18L18 6M6 6l12 12"
+                                                                d="M9 5l7 7-7 7"
                                                             />
                                                         </svg>
-                                                    </button>
-                                                {:else}
-                                                    <span
-                                                        class="text-xs text-slate-400 italic"
-                                                        >Locked</span
-                                                    >
+                                                        <span class="font-medium text-slate-700 dark:text-slate-300 text-sm">
+                                                            {subGroup.displayName}
+                                                        </span>
+                                                        <span class="px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-300 text-xs font-medium">
+                                                            {subGroup.blocks.length} block{subGroup.blocks.length !== 1 ? 's' : ''}
+                                                        </span>
+                                                    </div>
+                                                    <div class="flex items-center gap-3">
+                                                        <span class="text-sm font-medium text-slate-600 dark:text-slate-400 tabular-nums">
+                                                            {(subGroup.billableMinutes / 60).toFixed(1)}h
+                                                        </span>
+                                                        {#if stats}
+                                                            <span class="text-sm text-green-600 font-medium tabular-nums">
+                                                                {formatCurrency(
+                                                                    (subGroup.billableMinutes / 60) * stats.rate_amount,
+                                                                    stats.currency_code
+                                                                )}
+                                                            </span>
+                                                        {/if}
+                                                    </div>
+                                                </button>
+
+                                                <!-- Sub-group blocks (expanded) -->
+                                                {#if expandedSubGroups.has(`${dateGroup.date}:${subGroup.key}`)}
+                                                    <div class="divide-y divide-slate-50 dark:divide-slate-700 bg-white dark:bg-slate-800">
+                                                        {#each subGroup.blocks as block (block.block_id)}
+                                                            <div
+                                                                class="px-6 py-3 pl-12 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex items-start gap-4"
+                                                            >
+                                                                <!-- Time Column -->
+                                                                <div class="w-20 shrink-0">
+                                                                    <div class="text-sm font-medium text-slate-900 dark:text-slate-100">
+                                                                        {format(parseISO(block.ts_start), "HH:mm")}
+                                                                    </div>
+                                                                    <div class="text-xs text-slate-500 dark:text-slate-400">
+                                                                        to {format(parseISO(block.ts_end), "HH:mm")}
+                                                                    </div>
+                                                                </div>
+
+                                                                <!-- Activity Info -->
+                                                                <div class="flex-1 min-w-0">
+                                                                    <div class="text-sm text-slate-900 dark:text-slate-100 break-words">
+                                                                        {block.title_summary || block.primary_app_name}
+                                                                    </div>
+                                                                    <div class="flex items-center gap-2 mt-1">
+                                                                        <span class="text-xs text-slate-500 dark:text-slate-400">{block.primary_app_name}</span>
+                                                                        <span class="text-slate-300 dark:text-slate-600">•</span>
+                                                                        <span class="text-xs font-medium text-slate-600 dark:text-slate-400 tabular-nums">{block.duration_minutes.toFixed(0)} min</span>
+                                                                    </div>
+                                                                </div>
+
+                                                                <!-- Status Badges -->
+                                                                <div class="flex items-center gap-2 shrink-0">
+                                                                    <span class="text-xs px-2 py-1 rounded-md border {getConfidenceStyle(block.confidence)}">
+                                                                        {block.confidence}
+                                                                    </span>
+                                                                    {#if block.locked}
+                                                                        <span class="text-xs px-2 py-1 rounded-md bg-green-50 text-green-700 border border-green-200">
+                                                                            Locked
+                                                                        </span>
+                                                                    {/if}
+                                                                    {#if !block.billable}
+                                                                        <span class="text-xs px-2 py-1 rounded-md bg-slate-50 text-slate-600 border border-slate-200">
+                                                                            Non-billable
+                                                                        </span>
+                                                                    {/if}
+                                                                </div>
+
+                                                                <!-- Actions -->
+                                                                <div class="flex items-center gap-2 shrink-0">
+                                                                    {#if !block.locked}
+                                                                        <div class="w-32">
+                                                                            <ProfileSelector
+                                                                                placeholder="Change..."
+                                                                                value={stats?.profile_id}
+                                                                                disabled={processingBlockId === block.block_id}
+                                                                                on:change={(e) => reassignBlock(block.block_id, e.detail)}
+                                                                            />
+                                                                        </div>
+                                                                        <button
+                                                                            on:click={() => unassignBlock(block.block_id)}
+                                                                            disabled={processingBlockId === block.block_id}
+                                                                            class="text-xs text-slate-400 hover:text-red-600 transition-colors disabled:opacity-50"
+                                                                            title="Remove from this profile"
+                                                                        >
+                                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                                                            </svg>
+                                                                        </button>
+                                                                    {:else}
+                                                                        <span class="text-xs text-slate-400 italic">Locked</span>
+                                                                    {/if}
+                                                                </div>
+                                                            </div>
+                                                        {/each}
+                                                    </div>
                                                 {/if}
                                             </div>
-                                        </div>
-                                    {/each}
-                                </div>
+                                        {/each}
+                                    </div>
+                                {:else}
+                                    <!-- Standard flat list for monthly/lifetime views -->
+                                    <div
+                                        class="divide-y divide-slate-100 dark:divide-slate-700"
+                                    >
+                                        {#each dateGroup.blocks as block (block.block_id)}
+                                            <div
+                                                class="px-6 py-4 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex items-start gap-4"
+                                            >
+                                                <!-- Time Column -->
+                                                <div class="w-24 shrink-0">
+                                                    <div
+                                                        class="text-sm font-medium text-slate-900 dark:text-slate-100"
+                                                    >
+                                                        {format(
+                                                            parseISO(
+                                                                block.ts_start,
+                                                            ),
+                                                            "HH:mm",
+                                                        )}
+                                                    </div>
+                                                    <div
+                                                        class="text-xs text-slate-500 dark:text-slate-400"
+                                                    >
+                                                        to {format(
+                                                            parseISO(block.ts_end),
+                                                            "HH:mm",
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                <!-- Activity Info -->
+                                                <div class="flex-1 min-w-0">
+                                                    <div
+                                                        class="text-sm text-slate-900 dark:text-slate-100 break-words"
+                                                    >
+                                                        {block.title_summary ||
+                                                            block.primary_app_name}
+                                                    </div>
+                                                    <div
+                                                        class="flex items-center gap-2 mt-1"
+                                                    >
+                                                        <span
+                                                            class="text-xs text-slate-500 dark:text-slate-400"
+                                                            >{block.primary_app_name}</span
+                                                        >
+                                                        <span
+                                                            class="text-slate-300 dark:text-slate-600"
+                                                            >•</span
+                                                        >
+                                                        <span
+                                                            class="text-xs font-medium text-slate-600 dark:text-slate-400 tabular-nums"
+                                                            >{block.duration_minutes.toFixed(
+                                                                0,
+                                                            )} min</span
+                                                        >
+                                                    </div>
+                                                </div>
+
+                                                <!-- Status Badges -->
+                                                <div
+                                                    class="flex items-center gap-2 shrink-0"
+                                                >
+                                                    <span
+                                                        class="text-xs px-2 py-1 rounded-md border {getConfidenceStyle(
+                                                            block.confidence,
+                                                        )}"
+                                                    >
+                                                        {block.confidence}
+                                                    </span>
+                                                    {#if block.locked}
+                                                        <span
+                                                            class="text-xs px-2 py-1 rounded-md bg-green-50 text-green-700 border border-green-200"
+                                                        >
+                                                            Locked
+                                                        </span>
+                                                    {/if}
+                                                    {#if !block.billable}
+                                                        <span
+                                                            class="text-xs px-2 py-1 rounded-md bg-slate-50 text-slate-600 border border-slate-200"
+                                                        >
+                                                            Non-billable
+                                                        </span>
+                                                    {/if}
+                                                </div>
+
+                                                <!-- Actions -->
+                                                <div
+                                                    class="flex items-center gap-2 shrink-0"
+                                                >
+                                                    {#if !block.locked}
+                                                        <div class="w-36">
+                                                            <ProfileSelector
+                                                                placeholder="Change..."
+                                                                value={stats?.profile_id}
+                                                                disabled={processingBlockId ===
+                                                                    block.block_id}
+                                                                on:change={(e) =>
+                                                                    reassignBlock(
+                                                                        block.block_id,
+                                                                        e.detail,
+                                                                    )}
+                                                            />
+                                                        </div>
+                                                        <button
+                                                            on:click={() =>
+                                                                unassignBlock(
+                                                                    block.block_id,
+                                                                )}
+                                                            disabled={processingBlockId ===
+                                                                block.block_id}
+                                                            class="text-xs text-slate-400 hover:text-red-600 transition-colors disabled:opacity-50"
+                                                            title="Remove from this profile"
+                                                        >
+                                                            <svg
+                                                                class="w-4 h-4"
+                                                                fill="none"
+                                                                stroke="currentColor"
+                                                                viewBox="0 0 24 24"
+                                                            >
+                                                                <path
+                                                                    stroke-linecap="round"
+                                                                    stroke-linejoin="round"
+                                                                    stroke-width="2"
+                                                                    d="M6 18L18 6M6 6l12 12"
+                                                                />
+                                                            </svg>
+                                                        </button>
+                                                    {:else}
+                                                        <span
+                                                            class="text-xs text-slate-400 italic"
+                                                            >Locked</span
+                                                        >
+                                                    {/if}
+                                                </div>
+                                            </div>
+                                        {/each}
+                                    </div>
+                                {/if}
                             </div>
                         {/if}
                     </div>
