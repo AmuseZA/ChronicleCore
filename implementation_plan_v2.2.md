@@ -18,7 +18,12 @@ Application identity and system integration improvements.
     - Update `prepare_installer.ps1` to ensure the icon resource is generated before `go build`.
     - Verify Inno Setup uses the embedded icon for shortcuts.
 
-### Core Backend
+### Server & Backend
+#### [MODIFY] [Update Checker Logic]
+- **Goal**: Fix confusing log messages when local version is newer than remote (dev scenarios).
+- **Current Behavior**: Logs "No update available (current: 2.1.0, latest: 2.0.0)" which implies a downgrade is an update or is just confusing.
+- **Approach**: Implement semantic version comparison (SemVer) and handle `local > remote` specifically (e.g., "You are running a pre-release version").
+
 #### [MODIFY] [Event Architecture]
 - **Goal**: Move towards a true asynchronous event bus.
 - **Approach**: Refactor `windows.go` loop to decouple detection from enrichment completely, potentially using channels for "DetectedWindow" events.
