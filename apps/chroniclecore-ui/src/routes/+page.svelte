@@ -51,16 +51,20 @@
         let currentGroup: ActivityGroupType | null = null;
 
         // Sort blocks by start time (newest first for display, but we need oldest first for grouping)
-        const sortedBlocks = [...blocks].sort((a, b) =>
-            new Date(a.ts_start).getTime() - new Date(b.ts_start).getTime()
+        const sortedBlocks = [...blocks].sort(
+            (a, b) =>
+                new Date(a.ts_start).getTime() - new Date(b.ts_start).getTime(),
         );
 
         for (const block of sortedBlocks) {
             const blockStart = new Date(block.ts_start);
-            const shouldStartNewGroup = !currentGroup ||
+            const shouldStartNewGroup =
+                !currentGroup ||
                 block.profile_id !== currentGroup.profile_id ||
                 (currentGroup.end_time &&
-                    (blockStart.getTime() - new Date(currentGroup.end_time).getTime()) > 30 * 60 * 1000);
+                    blockStart.getTime() -
+                        new Date(currentGroup.end_time).getTime() >
+                        30 * 60 * 1000);
 
             if (shouldStartNewGroup) {
                 if (currentGroup) {
@@ -76,16 +80,18 @@
                     total_minutes: block.duration_minutes || 0,
                     summary: "",
                     apps: [block.primary_app_name],
-                    activities: [{
-                        block_id: block.block_id,
-                        ts_start: block.ts_start,
-                        ts_end: block.ts_end,
-                        duration_minutes: block.duration_minutes || 0,
-                        primary_app_name: block.primary_app_name,
-                        title_summary: block.title_summary,
-                        description: block.description,
-                        confidence: block.confidence || "MEDIUM",
-                    }],
+                    activities: [
+                        {
+                            block_id: block.block_id,
+                            ts_start: block.ts_start,
+                            ts_end: block.ts_end,
+                            duration_minutes: block.duration_minutes || 0,
+                            primary_app_name: block.primary_app_name,
+                            title_summary: block.title_summary,
+                            description: block.description,
+                            confidence: block.confidence || "MEDIUM",
+                        },
+                    ],
                 };
             } else {
                 currentGroup!.end_time = block.ts_end;
@@ -118,13 +124,16 @@
     function generateSummary(group: ActivityGroupType): string {
         const activities = group.activities;
         if (activities.length === 1) {
-            return activities[0].title_summary || activities[0].primary_app_name;
+            return (
+                activities[0].title_summary || activities[0].primary_app_name
+            );
         }
 
         // Count apps and create summary
         const appCounts: Record<string, number> = {};
-        activities.forEach(a => {
-            appCounts[a.primary_app_name] = (appCounts[a.primary_app_name] || 0) + 1;
+        activities.forEach((a) => {
+            appCounts[a.primary_app_name] =
+                (appCounts[a.primary_app_name] || 0) + 1;
         });
 
         const topApps = Object.entries(appCounts)
@@ -203,7 +212,9 @@
 <div class="max-w-7xl mx-auto space-y-8">
     <div class="flex items-center justify-between">
         <div>
-            <h1 class="text-2xl font-bold text-slate-900 tracking-tight">
+            <h1
+                class="text-2xl font-bold text-slate-900 dark:text-slate-50 tracking-tight"
+            >
                 Today's Overview
             </h1>
             <p class="text-slate-500 text-sm">
@@ -218,10 +229,20 @@
         <div class="flex gap-2">
             <button
                 on:click={() => (showManualModal = true)}
-                class="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg font-medium text-sm transition-colors border border-slate-200 shadow-sm"
+                class="flex items-center gap-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-4 py-2 rounded-lg font-medium text-sm transition-colors border border-slate-200 dark:border-slate-700 shadow-sm"
             >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                <svg
+                    class="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                >
+                    <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M12 4v16m8-8H4"
+                    />
                 </svg>
                 Add Entry
             </button>
@@ -246,7 +267,7 @@
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
         <!-- Total Time Worked (NEW - First Card) -->
         <div
-            class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group"
+            class="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden group"
         >
             <div
                 class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"
@@ -269,7 +290,7 @@
             >
                 Time Worked
             </div>
-            <div class="text-3xl font-bold text-slate-900">
+            <div class="text-3xl font-bold text-slate-900 dark:text-slate-100">
                 {stats.totalHours.toFixed(1)}
                 <span class="text-lg text-slate-400 font-normal">hrs</span>
             </div>
@@ -280,7 +301,7 @@
 
         <!-- Billable -->
         <div
-            class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group"
+            class="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden group"
         >
             <div
                 class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"
@@ -303,12 +324,12 @@
             >
                 Billable
             </div>
-            <div class="text-3xl font-bold text-slate-900">
+            <div class="text-3xl font-bold text-slate-900 dark:text-slate-100">
                 {stats.billableHours.toFixed(1)}
                 <span class="text-lg text-slate-400 font-normal">hrs</span>
             </div>
             <div
-                class="mt-4 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden"
+                class="mt-4 h-1.5 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden"
             >
                 <div
                     class="h-full bg-amber-500 rounded-full"
@@ -321,7 +342,7 @@
 
         <!-- Productivity Score -->
         <div
-            class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group"
+            class="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden group"
         >
             <div
                 class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"
@@ -344,13 +365,13 @@
             >
                 Avg Focus
             </div>
-            <div class="text-3xl font-bold text-slate-900">
+            <div class="text-3xl font-bold text-slate-900 dark:text-slate-100">
                 {stats.productivityScore.toFixed(0)}<span
                     class="text-lg text-slate-400 font-normal">%</span
                 >
             </div>
             <div
-                class="mt-4 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden"
+                class="mt-4 h-1.5 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden"
             >
                 <div
                     class="h-full bg-green-500 rounded-full"
@@ -361,7 +382,7 @@
 
         <!-- Needs Review -->
         <div
-            class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group"
+            class="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden group"
         >
             <div
                 class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"
@@ -384,7 +405,7 @@
             >
                 Needs Review
             </div>
-            <div class="text-3xl font-bold text-slate-900">
+            <div class="text-3xl font-bold text-slate-900 dark:text-slate-100">
                 {stats.reviewCount}
                 <span class="text-lg text-slate-400 font-normal">items</span>
             </div>
@@ -401,7 +422,7 @@
 
     {#if error}
         <div
-            class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center gap-2"
+            class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg flex items-center gap-2"
         >
             <svg
                 class="w-5 h-5"
@@ -422,19 +443,23 @@
     {/if}
 
     <div
-        class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4"
+        class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-6 space-y-4"
     >
-        <h2 class="text-lg font-bold text-slate-900">Live Activity</h2>
+        <h2 class="text-lg font-bold text-slate-900 dark:text-slate-100">
+            Live Activity
+        </h2>
         <TrackingControl />
     </div>
 
     <div
-        class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
+        class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden"
     >
         <div
-            class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50"
+            class="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/50"
         >
-            <h2 class="text-lg font-bold text-slate-900">Timeline</h2>
+            <h2 class="text-lg font-bold text-slate-900 dark:text-slate-100">
+                Timeline
+            </h2>
             <span class="text-sm text-slate-500">
                 {activityGroups.length} groups
             </span>
@@ -446,13 +471,31 @@
                 </div>
             {:else if activityGroups.length === 0}
                 <div class="text-center py-12">
-                    <div class="mx-auto w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-3 text-slate-400">
-                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <div
+                        class="mx-auto w-12 h-12 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center mb-3 text-slate-400"
+                    >
+                        <svg
+                            class="w-6 h-6"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                            />
                         </svg>
                     </div>
-                    <h3 class="text-sm font-medium text-slate-900">No activity yet</h3>
-                    <p class="text-sm text-slate-500 mt-1">Start tracking to see your work blocks here.</p>
+                    <h3
+                        class="text-sm font-medium text-slate-900 dark:text-slate-100"
+                    >
+                        No activity yet
+                    </h3>
+                    <p class="text-sm text-slate-500 mt-1">
+                        Start tracking to see your work blocks here.
+                    </p>
                 </div>
             {:else}
                 {#each activityGroups as group}

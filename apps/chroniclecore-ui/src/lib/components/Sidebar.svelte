@@ -8,12 +8,14 @@
 </script>
 
 <aside
-    class="bg-white flex flex-col fixed inset-y-0 h-full border-r border-slate-200 z-50 transition-all duration-300 {$ui.isSidebarCollapsed
+    class="bg-white dark:bg-slate-900 flex flex-col fixed inset-y-0 h-full border-r border-slate-200 dark:border-slate-800 z-50 transition-all duration-300 {$ui.isSidebarCollapsed
         ? 'w-20'
         : 'w-72'}"
 >
     <!-- Brand Header -->
-    <div class="h-20 flex items-center px-4 border-b border-slate-100 relative">
+    <div
+        class="h-20 flex items-center px-4 border-b border-slate-100 dark:border-slate-800 relative"
+    >
         <div
             class="flex items-center gap-3 w-full {$ui.isSidebarCollapsed
                 ? 'justify-center'
@@ -39,7 +41,7 @@
             {#if !$ui.isSidebarCollapsed}
                 <div class="overflow-hidden whitespace-nowrap">
                     <h1
-                        class="font-bold text-xl text-slate-900 tracking-tight leading-none"
+                        class="font-bold text-xl text-slate-900 dark:text-slate-100 tracking-tight leading-none"
                     >
                         Chronicle
                     </h1>
@@ -100,16 +102,16 @@
             href="/"
             class="group flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-all duration-200
            {$page.url.pathname === '/'
-                ? 'bg-blue-50 text-blue-700 shadow-sm ring-1 ring-blue-100'
-                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
+                ? 'bg-blue-50 text-blue-700 shadow-sm ring-1 ring-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:ring-blue-800'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200'}
            {$ui.isSidebarCollapsed ? 'justify-center' : ''}"
             title="Dashboard"
         >
             <div
                 class="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center transition-colors
                 {$page.url.pathname === '/'
-                    ? 'bg-blue-100 text-blue-600'
-                    : 'bg-slate-100 text-slate-500 group-hover:bg-white group-hover:shadow-sm'}"
+                    ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 group-hover:bg-white dark:group-hover:bg-slate-700 group-hover:shadow-sm'}"
             >
                 <svg
                     class="w-5 h-5"
@@ -134,16 +136,16 @@
             href="/review"
             class="group flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-all duration-200
            {$page.url.pathname === '/review'
-                ? 'bg-amber-50 text-amber-700 shadow-sm ring-1 ring-amber-100'
-                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
+                ? 'bg-amber-50 text-amber-700 shadow-sm ring-1 ring-amber-100 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-800'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200'}
            {$ui.isSidebarCollapsed ? 'justify-center' : ''}"
             title="Items to Review"
         >
             <div
                 class="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center transition-colors
                 {$page.url.pathname === '/review'
-                    ? 'bg-amber-100 text-amber-600'
-                    : 'bg-slate-100 text-slate-500 group-hover:bg-white group-hover:shadow-sm'}"
+                    ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-400'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 group-hover:bg-white dark:group-hover:bg-slate-700 group-hover:shadow-sm'}"
             >
                 <svg
                     class="w-5 h-5"
@@ -168,16 +170,16 @@
             href="/history"
             class="group flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-all duration-200
            {$page.url.pathname === '/history'
-                ? 'bg-violet-50 text-violet-700 shadow-sm ring-1 ring-violet-100'
-                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
+                ? 'bg-violet-50 text-violet-700 shadow-sm ring-1 ring-violet-100 dark:bg-violet-900/20 dark:text-violet-400 dark:ring-violet-800'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200'}
            {$ui.isSidebarCollapsed ? 'justify-center' : ''}"
             title="History & Reports"
         >
             <div
                 class="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center transition-colors
                 {$page.url.pathname === '/history'
-                    ? 'bg-violet-100 text-violet-600'
-                    : 'bg-slate-100 text-slate-500 group-hover:bg-white group-hover:shadow-sm'}"
+                    ? 'bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-400'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 group-hover:bg-white dark:group-hover:bg-slate-700 group-hover:shadow-sm'}"
             >
                 <svg
                     class="w-5 h-5"
@@ -202,16 +204,16 @@
             href="/suggestions"
             class="group flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-all duration-200
            {$page.url.pathname === '/suggestions'
-                ? 'bg-purple-50 text-purple-700 shadow-sm ring-1 ring-purple-100'
-                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
+                ? 'bg-purple-50 text-purple-700 shadow-sm ring-1 ring-purple-100 dark:bg-purple-900/20 dark:text-purple-400 dark:ring-purple-800'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200'}
            {$ui.isSidebarCollapsed ? 'justify-center' : ''}"
             title="ML Suggestions"
         >
             <div
                 class="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center transition-colors
                 {$page.url.pathname === '/suggestions'
-                    ? 'bg-purple-100 text-purple-600'
-                    : 'bg-slate-100 text-slate-500 group-hover:bg-white group-hover:shadow-sm'}"
+                    ? 'bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-400'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 group-hover:bg-white dark:group-hover:bg-slate-700 group-hover:shadow-sm'}"
             >
                 <svg
                     class="w-5 h-5"
@@ -246,16 +248,16 @@
             href="/profiles"
             class="group flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-all duration-200
            {$page.url.pathname.startsWith('/profiles')
-                ? 'bg-emerald-50 text-emerald-700 shadow-sm ring-1 ring-emerald-100'
-                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
+                ? 'bg-emerald-50 text-emerald-700 shadow-sm ring-1 ring-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:ring-emerald-800'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200'}
            {$ui.isSidebarCollapsed ? 'justify-center' : ''}"
             title="Profiles & Rates"
         >
             <div
                 class="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center transition-colors
                 {$page.url.pathname.startsWith('/profiles')
-                    ? 'bg-emerald-100 text-emerald-600'
-                    : 'bg-slate-100 text-slate-500 group-hover:bg-white group-hover:shadow-sm'}"
+                    ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 group-hover:bg-white dark:group-hover:bg-slate-700 group-hover:shadow-sm'}"
             >
                 <svg
                     class="w-5 h-5"
@@ -280,16 +282,16 @@
             href="/settings"
             class="group flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-all duration-200
            {$page.url.pathname === '/settings'
-                ? 'bg-slate-100 text-slate-900 shadow-sm ring-1 ring-slate-200'
-                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
+                ? 'bg-slate-100 text-slate-900 shadow-sm ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200'}
            {$ui.isSidebarCollapsed ? 'justify-center' : ''}"
             title="Settings"
         >
             <div
                 class="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center transition-colors
                 {$page.url.pathname === '/settings'
-                    ? 'bg-white text-slate-700'
-                    : 'bg-slate-100 text-slate-500 group-hover:bg-white group-hover:shadow-sm'}"
+                    ? 'bg-white text-slate-700 dark:bg-slate-700 dark:text-slate-200'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 group-hover:bg-white dark:group-hover:bg-slate-700 group-hover:shadow-sm'}"
             >
                 <svg
                     class="w-5 h-5"
@@ -318,20 +320,24 @@
     </nav>
 
     <!-- User Footer -->
-    <div class="p-6 border-t border-slate-100 bg-slate-50/50">
+    <div
+        class="p-6 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50"
+    >
         <div
             class="flex items-center gap-3 {$ui.isSidebarCollapsed
                 ? 'justify-center'
                 : ''}"
         >
             <div
-                class="w-10 h-10 rounded-full bg-slate-200 border-2 border-white flex-shrink-0 flex items-center justify-center text-sm font-bold text-slate-500 shadow-sm"
+                class="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 border-2 border-white dark:border-slate-600 flex-shrink-0 flex items-center justify-center text-sm font-bold text-slate-500 dark:text-slate-300 shadow-sm"
             >
                 US
             </div>
             {#if !$ui.isSidebarCollapsed}
                 <div class="flex-1 min-w-0 overflow-hidden">
-                    <p class="text-sm font-bold text-slate-800 truncate">
+                    <p
+                        class="text-sm font-bold text-slate-800 dark:text-slate-200 truncate"
+                    >
                         Current User
                     </p>
                     <div class="flex items-center gap-1.5">

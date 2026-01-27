@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	AppVersion          = "2.0.0"
+	AppVersion          = "2.1.0"
 	DefaultPort         = "8080"
 	MLPort              = 8081
 	UpdateCheckInterval = 30 * time.Minute
@@ -498,11 +498,18 @@ func handleTrackingStatus(w http.ResponseWriter, r *http.Request) {
 
 	status := appTracker.GetStatus()
 
+	// Get daily total time
+	todaySeconds, err := appStore.GetDailyTotalTime(time.Now())
+	if err != nil {
+		log.Printf("Failed to get daily total: %v", err)
+	}
+
 	response := map[string]interface{}{
-		"state":          string(status.State),
-		"last_active_at": nil,
-		"idle_seconds":   status.IdleSeconds,
-		"current_window": nil,
+		"state":              string(status.State),
+		"last_active_at":     nil,
+		"idle_seconds":       status.IdleSeconds,
+		"current_window":     nil,
+		"today_time_seconds": todaySeconds,
 	}
 
 	if status.LastActiveAt != nil {
