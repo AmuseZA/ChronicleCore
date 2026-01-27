@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	AppVersion          = "2.2.0"
+	AppVersion          = "2.3.0"
 	DefaultPort         = "8080"
 	MLPort              = 8081
 	UpdateCheckInterval = 30 * time.Minute
@@ -659,7 +659,7 @@ func checkForUpdateBackground() {
 	case 1:
 		// Local is newer - development/pre-release build
 		log.Printf("📦 Running development build (v%s > latest release v%s)", AppVersion, latestVersion)
-	// case 0: versions are equal, no action needed
+		// case 0: versions are equal, no action needed
 	}
 }
 

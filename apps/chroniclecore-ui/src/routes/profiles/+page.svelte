@@ -63,13 +63,15 @@
 
 <div class="max-w-7xl mx-auto space-y-6">
     <div
-        class="flex justify-between items-center bg-white p-6 rounded-2xl border border-slate-200 shadow-sm"
+        class="flex justify-between items-center bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm"
     >
         <div>
-            <h1 class="text-2xl font-bold text-slate-900 tracking-tight">
+            <h1
+                class="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight"
+            >
                 Profiles
             </h1>
-            <p class="text-slate-500 mt-1">
+            <p class="text-slate-500 dark:text-slate-400 mt-1">
                 Manage your clients, projects, and billing rates in one place.
             </p>
         </div>
@@ -117,7 +119,9 @@
         class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden"
     >
         {#if loading}
-            <div class="p-12 text-center text-slate-500 animate-pulse">
+            <div
+                class="p-12 text-center text-slate-500 dark:text-slate-400 animate-pulse"
+            >
                 Loading profiles...
             </div>
         {:else if profiles.length === 0}
@@ -125,7 +129,7 @@
                 class="p-16 text-center flex flex-col items-center justify-center"
             >
                 <div
-                    class="w-16 h-16 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mb-4"
+                    class="w-16 h-16 bg-slate-100 dark:bg-slate-700 text-slate-400 dark:text-slate-500 rounded-full flex items-center justify-center mb-4"
                 >
                     <svg
                         class="w-8 h-8"
@@ -140,10 +144,12 @@
                         /></svg
                     >
                 </div>
-                <h3 class="text-lg font-bold text-slate-900">
+                <h3
+                    class="text-lg font-bold text-slate-900 dark:text-slate-100"
+                >
                     No profiles yet
                 </h3>
-                <p class="text-slate-500 mt-1 max-w-sm">
+                <p class="text-slate-500 dark:text-slate-400 mt-1 max-w-sm">
                     Create your first profile to start tracking time against
                     clients and rates.
                 </p>
@@ -155,29 +161,35 @@
             </div>
         {:else}
             <table class="w-full text-left">
-                <thead class="bg-slate-50/50 border-b border-slate-200">
+                <thead
+                    class="bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700"
+                >
                     <tr>
                         <th
-                            class="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider"
+                            class="px-6 py-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider"
                             >Client & Project</th
                         >
                         <th
-                            class="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider"
+                            class="px-6 py-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider"
                             >Service</th
                         >
                         <th
-                            class="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider"
+                            class="px-6 py-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider"
                             >Billable Rate</th
                         >
                         <th
-                            class="px-6 py-4 text-right text-xs font-bold text-slate-400 uppercase tracking-wider"
+                            class="px-6 py-4 text-right text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider"
                             >Actions</th
                         >
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-100">
+                <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
                     {#each profiles as p}
-                        <tr class="hover:bg-slate-50 transition-colors group cursor-pointer" on:click={() => window.location.href = `/profiles/${p.profile_id}`}>
+                        <tr
+                            class="hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors group cursor-pointer"
+                            on:click={() =>
+                                (window.location.href = `/profiles/${p.profile_id}`)}
+                        >
                             <td class="px-6 py-4">
                                 <div class="flex items-center gap-3">
                                     <div
@@ -191,12 +203,14 @@
                                     </div>
                                     <div>
                                         <div
-                                            class="font-semibold text-slate-900"
+                                            class="font-semibold text-slate-900 dark:text-slate-100"
                                         >
                                             {p.client_name}
                                         </div>
                                         {#if p.project_name}
-                                            <div class="text-xs text-slate-500">
+                                            <div
+                                                class="text-xs text-slate-500 dark:text-slate-400"
+                                            >
                                                 {p.project_name}
                                             </div>
                                         {/if}
@@ -205,31 +219,34 @@
                             </td>
                             <td class="px-6 py-4">
                                 <div
-                                    class="inline-flex px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 text-xs font-medium border border-slate-200"
+                                    class="inline-flex px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-medium border border-slate-200 dark:border-slate-600"
                                 >
                                     {p.service_name}
                                 </div>
                             </td>
                             <td class="px-6 py-4">
                                 <div
-                                    class="font-mono text-sm text-slate-700 font-medium tracking-tight"
+                                    class="font-mono text-sm text-slate-700 dark:text-slate-300 font-medium tracking-tight"
                                 >
                                     {formatCurrency(
                                         p.rate_amount,
                                         p.currency_code || "USD",
                                     )}
-                                    <span class="text-slate-400 text-xs ml-1"
+                                    <span
+                                        class="text-slate-400 dark:text-slate-500 text-xs ml-1"
                                         >/hr</span
                                     >
                                 </div>
-                                <div class="text-[10px] text-slate-400 mt-0.5">
+                                <div
+                                    class="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5"
+                                >
                                     {p.rate_name}
                                 </div>
                             </td>
-                            <td
-                                class="px-6 py-4 text-right"
-                            >
-                                <div class="flex items-center justify-end gap-3">
+                            <td class="px-6 py-4 text-right">
+                                <div
+                                    class="flex items-center justify-end gap-3"
+                                >
                                     <a
                                         href="/profiles/{p.profile_id}"
                                         class="text-blue-600 hover:text-blue-700 font-medium text-sm hover:underline"
@@ -238,7 +255,8 @@
                                         View Details
                                     </a>
                                     <button
-                                        on:click|stopPropagation={() => deleteProfile(p.profile_id)}
+                                        on:click|stopPropagation={() =>
+                                            deleteProfile(p.profile_id)}
                                         class="text-red-600 hover:text-red-700 font-medium text-sm hover:underline opacity-0 group-hover:opacity-100 transition-opacity"
                                     >
                                         Remove
@@ -253,4 +271,10 @@
     </div>
 </div>
 
-<UnifiedProfileModal bind:isOpen={isModalOpen} on:success={() => { isModalOpen = false; loadProfiles(); }} />
+<UnifiedProfileModal
+    bind:isOpen={isModalOpen}
+    on:success={() => {
+        isModalOpen = false;
+        loadProfiles();
+    }}
+/>

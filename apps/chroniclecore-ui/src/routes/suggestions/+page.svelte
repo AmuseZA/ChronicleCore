@@ -189,7 +189,7 @@
     <header class="flex justify-between items-start">
         <div>
             <h1
-                class="text-2xl font-bold text-slate-900 flex items-center gap-3"
+                class="text-2xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-3"
             >
                 ML Suggestions
                 <span
@@ -197,7 +197,7 @@
                     >Beta</span
                 >
             </h1>
-            <p class="text-slate-500">
+            <p class="text-slate-500 dark:text-slate-400">
                 Review AI-generated profile suggestions. Accept to apply, reject
                 to dismiss.
             </p>
@@ -237,8 +237,10 @@
                     />
                 </svg>
             </div>
-            <h3 class="text-lg font-medium text-slate-900">No suggestions</h3>
-            <p class="text-slate-500">
+            <h3 class="text-lg font-medium text-slate-900 dark:text-slate-100">
+                No suggestions
+            </h3>
+            <p class="text-slate-500 dark:text-slate-400">
                 Train the ML model from the Review page to generate suggestions.
             </p>
         </div>
@@ -254,7 +256,8 @@
                             >
                                 High Confidence ({highConfidence.length})
                             </span>
-                            <span class="text-sm text-slate-500"
+                            <span
+                                class="text-sm text-slate-500 dark:text-slate-400"
                                 >≥85% match probability</span
                             >
                         </div>
@@ -296,7 +299,7 @@
                                             {/if}
                                         </div>
                                         <h3
-                                            class="font-medium text-slate-900 mb-1"
+                                            class="font-medium text-slate-900 dark:text-slate-100 mb-1"
                                         >
                                             {suggestion.block_details
                                                 ?.title_summary ||
@@ -327,7 +330,8 @@
                                         <div
                                             class="mt-3 flex items-center gap-2"
                                         >
-                                            <span class="text-sm text-slate-500"
+                                            <span
+                                                class="text-sm text-slate-500 dark:text-slate-400"
                                                 >Suggested:</span
                                             >
                                             <span
@@ -379,7 +383,8 @@
                             >
                                 Medium Confidence ({mediumConfidence.length})
                             </span>
-                            <span class="text-sm text-slate-500"
+                            <span
+                                class="text-sm text-slate-500 dark:text-slate-400"
                                 >60-85% match probability</span
                             >
                         </div>
@@ -446,7 +451,8 @@
                                         <div
                                             class="mt-3 flex items-center gap-2"
                                         >
-                                            <span class="text-sm text-slate-500"
+                                            <span
+                                                class="text-sm text-slate-500 dark:text-slate-400"
                                                 >Suggested:</span
                                             >
                                             <span
@@ -498,7 +504,8 @@
                             >
                                 Low Confidence ({lowConfidence.length})
                             </span>
-                            <span class="text-sm text-slate-500"
+                            <span
+                                class="text-sm text-slate-500 dark:text-slate-400"
                                 >&lt;60% match probability</span
                             >
                         </div>
@@ -565,7 +572,8 @@
                                         <div
                                             class="mt-3 flex items-center gap-2"
                                         >
-                                            <span class="text-sm text-slate-500"
+                                            <span
+                                                class="text-sm text-slate-500 dark:text-slate-400"
                                                 >Suggested:</span
                                             >
                                             <span
@@ -617,7 +625,8 @@
                             >
                                 Suggested Deletions ({deleteSuggestions.length})
                             </span>
-                            <span class="text-sm text-slate-500"
+                            <span
+                                class="text-sm text-slate-500 dark:text-slate-400"
                                 >Learned from your previous deletions</span
                             >
                         </div>

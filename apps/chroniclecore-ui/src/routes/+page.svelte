@@ -217,7 +217,7 @@
             >
                 Today's Overview
             </h1>
-            <p class="text-slate-500 text-sm">
+            <p class="text-slate-500 dark:text-slate-400 text-sm">
                 {new Date().toLocaleDateString(undefined, {
                     weekday: "long",
                     year: "numeric",
@@ -286,15 +286,18 @@
                 >
             </div>
             <div
-                class="text-sm font-medium text-slate-500 uppercase tracking-wider mb-1"
+                class="text-sm font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1"
             >
                 Time Worked
             </div>
             <div class="text-3xl font-bold text-slate-900 dark:text-slate-100">
                 {stats.totalHours.toFixed(1)}
-                <span class="text-lg text-slate-400 font-normal">hrs</span>
+                <span
+                    class="text-lg text-slate-400 dark:text-slate-500 font-normal"
+                    >hrs</span
+                >
             </div>
-            <div class="mt-2 text-sm text-slate-500">
+            <div class="mt-2 text-sm text-slate-500 dark:text-slate-400">
                 {stats.totalActivities} activities
             </div>
         </div>
@@ -320,13 +323,16 @@
                 >
             </div>
             <div
-                class="text-sm font-medium text-slate-500 uppercase tracking-wider mb-1"
+                class="text-sm font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1"
             >
                 Billable
             </div>
             <div class="text-3xl font-bold text-slate-900 dark:text-slate-100">
                 {stats.billableHours.toFixed(1)}
-                <span class="text-lg text-slate-400 font-normal">hrs</span>
+                <span
+                    class="text-lg text-slate-400 dark:text-slate-500 font-normal"
+                    >hrs</span
+                >
             </div>
             <div
                 class="mt-4 h-1.5 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden"
@@ -361,7 +367,7 @@
                 >
             </div>
             <div
-                class="text-sm font-medium text-slate-500 uppercase tracking-wider mb-1"
+                class="text-sm font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1"
             >
                 Avg Focus
             </div>
@@ -401,13 +407,16 @@
                 >
             </div>
             <div
-                class="text-sm font-medium text-slate-500 uppercase tracking-wider mb-1"
+                class="text-sm font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1"
             >
                 Needs Review
             </div>
             <div class="text-3xl font-bold text-slate-900 dark:text-slate-100">
                 {stats.reviewCount}
-                <span class="text-lg text-slate-400 font-normal">items</span>
+                <span
+                    class="text-lg text-slate-400 dark:text-slate-500 font-normal"
+                    >items</span
+                >
             </div>
             <div class="mt-2">
                 <a
@@ -460,13 +469,15 @@
             <h2 class="text-lg font-bold text-slate-900 dark:text-slate-100">
                 Timeline
             </h2>
-            <span class="text-sm text-slate-500">
+            <span class="text-sm text-slate-500 dark:text-slate-400">
                 {activityGroups.length} groups
             </span>
         </div>
         <div class="p-4 space-y-3">
             {#if loading}
-                <div class="text-center py-8 text-slate-500">
+                <div
+                    class="text-center py-8 text-slate-500 dark:text-slate-400"
+                >
                     Loading activities...
                 </div>
             {:else if activityGroups.length === 0}
@@ -493,7 +504,7 @@
                     >
                         No activity yet
                     </h3>
-                    <p class="text-sm text-slate-500 mt-1">
+                    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
                         Start tracking to see your work blocks here.
                     </p>
                 </div>

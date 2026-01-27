@@ -2,7 +2,7 @@
 ; Creates a single-EXE installer with everything embedded
 
 #define MyAppName "ChronicleCore"
-#define MyAppVersion "2.2.0"
+#define MyAppVersion "2.3.0"
 #define MyAppPublisher "ChronicleCore"
 #define MyAppExeName "ChronicleCore.bat"
 #define MyAppURL "https://github.com/yourusername/chroniclecore"

@@ -729,7 +729,7 @@ func (h *ProfileHandler) GetProfileStats(w http.ResponseWriter, r *http.Request)
 			blockArgs = append(blockArgs, startDate, endDate)
 		}
 
-		blocksQuery += " ORDER BY b.ts_start DESC LIMIT 100"
+		blocksQuery += " ORDER BY b.ts_start DESC"
 
 		rows, err := h.store.GetDB().Query(blocksQuery, blockArgs...)
 		if err == nil {

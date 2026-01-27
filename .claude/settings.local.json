@@ -57,7 +57,11 @@
       "Bash(git tag:*)",
       "Bash(gh release create:*)",
       "Bash(gh release view:*)",
-      "Bash(gh release:*)"
+      "Bash(gh release:*)",
+      "Bash(build.bat)",
+      "Bash(\"$LOCALAPPDATA/Programs/Inno Setup 6/ISCC.exe\" \"h:\\\\Antigravity - Tremor\\\\.gemini\\\\antigravity\\\\workspaces\\\\ChronicleCore\\\\chroniclecore.iss\")",
+      "Bash(cmd /c \"cd /d h:\\\\Antigravity - Tremor\\\\.gemini\\\\antigravity\\\\workspaces\\\\ChronicleCore\\\\apps\\\\chroniclecore-core && build.bat\")",
+      "Bash(CGO_ENABLED=1 CC=\"C:/Users/josh/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/bin/gcc.exe\" go build:*)"
     ]
   }
 }

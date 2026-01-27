@@ -105,7 +105,7 @@
                     Version
                 </div>
                 <div class="mt-1 text-sm text-slate-900 dark:text-slate-100">
-                    v2.1.0
+                    v2.3.0
                 </div>
             </div>
             <div>

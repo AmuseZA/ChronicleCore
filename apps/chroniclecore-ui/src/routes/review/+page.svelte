@@ -338,8 +338,10 @@
     <!-- Header -->
     <header class="flex justify-between items-start">
         <div>
-            <h1 class="text-2xl font-bold text-slate-900">Needs Review</h1>
-            <p class="text-slate-500">
+            <h1 class="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                Needs Review
+            </h1>
+            <p class="text-slate-500 dark:text-slate-400">
                 Activities grouped by context - assign profiles or blacklist
                 apps.
             </p>
@@ -355,9 +357,9 @@
             <!-- ML Status & Training -->
             {#if mlStatus}
                 <div
-                    class="flex items-center gap-3 px-4 py-2 bg-slate-50 rounded-lg border border-slate-200"
+                    class="flex items-center gap-3 px-4 py-2 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700"
                 >
-                    <div class="text-xs text-slate-500">
+                    <div class="text-xs text-slate-500 dark:text-slate-400">
                         <span class="font-medium"
                             >{mlStatus.training_samples}</span
                         > data points
@@ -428,8 +430,12 @@
                     />
                 </svg>
             </div>
-            <h3 class="text-lg font-medium text-slate-900">All caught up!</h3>
-            <p class="text-slate-500">No activities need review right now.</p>
+            <h3 class="text-lg font-medium text-slate-900 dark:text-slate-100">
+                All caught up!
+            </h3>
+            <p class="text-slate-500 dark:text-slate-400">
+                No activities need review right now.
+            </p>
         </div>
     {:else}
         <div class="space-y-8">
@@ -461,7 +467,12 @@
                                                     <span
                                                         class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-700 border border-blue-200 whitespace-nowrap"
                                                     >
-                                                        {format(parseISO(group.date), "MMM d")}
+                                                        {format(
+                                                            parseISO(
+                                                                group.date,
+                                                            ),
+                                                            "MMM d",
+                                                        )}
                                                     </span>
                                                 {/if}
                                                 <h3
@@ -495,7 +506,7 @@
                                                         />
                                                     </svg>
                                                     <span
-                                                        class="font-medium text-slate-700"
+                                                        class="font-medium text-slate-700 dark:text-slate-300"
                                                         >{group.total_minutes.toFixed(
                                                             0,
                                                         )} min</span
@@ -580,7 +591,7 @@
                                     </div>
                                 </div>
                                 <div
-                                    class="bg-slate-50 px-5 py-3 border-t border-slate-100 flex justify-between items-center"
+                                    class="bg-slate-50 dark:bg-slate-700 px-5 py-3 border-t border-slate-100 dark:border-slate-600 flex justify-between items-center"
                                 >
                                     <button
                                         on:click={() =>
@@ -640,15 +651,17 @@
 
                                 {#if expandedGroups.has(group.group_key)}
                                     <div
-                                        class="border-t border-slate-100 bg-white"
+                                        class="border-t border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800"
                                     >
-                                        <div class="divide-y divide-slate-100">
+                                        <div
+                                            class="divide-y divide-slate-100 dark:divide-slate-700"
+                                        >
                                             {#each group.blocks as block}
                                                 <div
-                                                    class="p-4 hover:bg-slate-50 transition-colors flex gap-4 items-start text-sm"
+                                                    class="p-4 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex gap-4 items-start text-sm"
                                                 >
                                                     <div
-                                                        class="w-32 shrink-0 text-slate-500 text-xs mt-0.5"
+                                                        class="w-32 shrink-0 text-slate-500 dark:text-slate-400 text-xs mt-0.5"
                                                     >
                                                         <div>
                                                             {format(
@@ -664,7 +677,7 @@
                                                             )}
                                                         </div>
                                                         <div
-                                                            class="mt-1 font-medium text-slate-600"
+                                                            class="mt-1 font-medium text-slate-600 dark:text-slate-300"
                                                         >
                                                             {block.duration_minutes.toFixed(
                                                                 0,
@@ -673,7 +686,7 @@
                                                     </div>
                                                     <div class="flex-1 min-w-0">
                                                         <p
-                                                            class="text-slate-700 break-words leading-relaxed"
+                                                            class="text-slate-700 dark:text-slate-300 break-words leading-relaxed"
                                                         >
                                                             {block.title_summary ||
                                                                 block.primary_app_name}
@@ -788,7 +801,12 @@
                                                     <span
                                                         class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-700 border border-blue-200 whitespace-nowrap"
                                                     >
-                                                        {format(parseISO(group.date), "MMM d")}
+                                                        {format(
+                                                            parseISO(
+                                                                group.date,
+                                                            ),
+                                                            "MMM d",
+                                                        )}
                                                     </span>
                                                 {/if}
                                                 <h3
