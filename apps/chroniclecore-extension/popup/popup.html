@@ -1,19 +1,32 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ChronicleCore</title>
   <link rel="stylesheet" href="popup.css">
 </head>
+
 <body>
   <div class="container">
     <div class="header">
-      <img src="../icons/icon48.png" alt="ChronicleCore" class="logo">
-      <div class="header-text">
-        <h1>ChronicleCore</h1>
-        <span class="version">v1.0.0</span>
+      <div class="header-left">
+        <img src="../icons/icon48.png" alt="ChronicleCore" class="logo">
+        <div class="header-text">
+          <h1>ChronicleCore</h1>
+          <span class="version">v1.0.0</span>
+        </div>
       </div>
+      <button id="themeToggle" class="icon-btn" title="Toggle Dark Mode">
+        <span class="theme-icon">&#9728;</span>
+      </button>
+    </div>
+
+    <!-- Daily Timer -->
+    <div class="daily-summary">
+      <span class="label">Today</span>
+      <span id="dailyTime" class="value">--:--</span>
     </div>
 
     <div id="serverStatus" class="status status-checking">
@@ -26,10 +39,25 @@
       <span class="status-text">Tracking active</span>
     </div>
 
+    <div id="idleIndicator" class="idle-indicator" style="display: none;">
+      <span class="idle-dot"></span>
+      <span id="idleText">Idle for 5m</span>
+    </div>
+
     <div class="buttons">
-      <button id="toggleBtn" class="btn btn-primary">
-        <span id="toggleIcon">&#9208;</span>
-        <span id="toggleText">Pause Tracking</span>
+      <button id="resumeBtn" class="btn btn-primary" style="display: none;">
+        <span>&#9654;</span>
+        <span>Resume Tracking</span>
+      </button>
+
+      <button id="pauseBtn" class="btn btn-secondary">
+        <span>&#9208;</span>
+        <span>Pause Tracking</span>
+      </button>
+
+      <button id="stopBtn" class="btn btn-danger">
+        <span>&#9209;</span>
+        <span>Stop Tracking</span>
       </button>
 
       <button id="dashboardBtn" class="btn btn-secondary">
@@ -39,15 +67,28 @@
     </div>
 
     <div id="lastActivity" class="last-activity">
-      <span class="label">Last activity:</span>
+      <div class="section-title">Latest Browser Activity</div>
       <span id="lastActivityText" class="value">--</span>
+    </div>
+
+    <div id="systemActivity" class="last-activity system-activity" style="display: none;">
+      <div class="section-title">System Activity</div>
+      <span id="systemActivityText" class="value">--</span>
     </div>
 
     <div class="footer">
       <a href="http://127.0.0.1:8080" target="_blank">Open ChronicleCore</a>
     </div>
+
+    <!-- Debug Info (Click version number to toggle) -->
+    <div id="debugSection" style="display: none; margin-top: 10px; border-top: 1px solid #ccc; padding-top: 5px;">
+      <div style="font-size: 10px; font-weight: bold; margin-bottom: 5px;">DEBUG INFO</div>
+      <pre id="debugInfo"
+        style="font-size: 9px; white-space: pre-wrap; word-break: break-all; max-height: 150px; overflow-y: auto; background: #eee; padding: 5px; color: #333;"></pre>
+    </div>
   </div>
 
   <script src="popup.js"></script>
 </body>
+
 </html>

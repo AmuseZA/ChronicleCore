@@ -231,7 +231,7 @@ func (t *Tracker) capture() {
 	t.activeSampleCount = 0
 
 	// Get current window info
-	winInfo, err := GetCurrentWindowInfo(t.config.IdleThresholdSeconds)
+	winInfo, err := GetCurrentWindowInfo(t.config.IdleThresholdSeconds, t.config.DeepTrackingEnabled)
 	if err != nil {
 		log.Printf("Failed to capture window info: %v", err)
 		return

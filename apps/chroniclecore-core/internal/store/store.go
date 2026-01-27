@@ -43,20 +43,20 @@ type RawEvent struct {
 
 // Block represents an aggregated time block
 type Block struct {
-	BlockID          int64
-	TsStart          time.Time
-	TsEnd            time.Time
-	PrimaryAppID     int64
-	PrimaryDomainID  *int64
-	TitleSummaryID   *int64
-	ProfileID        *int64
-	Confidence       string // HIGH, MEDIUM, LOW
-	Billable         bool
-	Locked           bool
-	Notes            *string
-	Description      *string
-	Metadata         *string
-	ActivityScore    float64 // 0.0-1.0 representing active work percentage for billing
+	BlockID         int64
+	TsStart         time.Time
+	TsEnd           time.Time
+	PrimaryAppID    int64
+	PrimaryDomainID *int64
+	TitleSummaryID  *int64
+	ProfileID       *int64
+	Confidence      string // HIGH, MEDIUM, LOW
+	Billable        bool
+	Locked          bool
+	Notes           *string
+	Description     *string
+	Metadata        *string
+	ActivityScore   float64 // 0.0-1.0 representing active work percentage for billing
 }
 
 // NewStore creates a new store instance (not yet initialized)
@@ -626,4 +626,42 @@ func (s *Store) GetAllSettings() (map[string]string, error) {
 	}
 
 	return settings, rows.Err()
+}
+
+// GetDailyTotalTime returns the total duration in seconds for all blocks on the given day
+func (s *Store) GetDailyTotalTime(day time.Time) (int64, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if !s.initialized {
+		return 0, fmt.Errorf("store not initialized")
+	}
+
+	// Start of day (00:00:00)
+	startOfDay := time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, day.Location())
+	// End of day (23:59:59)
+	endOfDay := startOfDay.Add(24 * time.Hour).Add(-1 * time.Second)
+
+	query := `
+		SELECT SUM(strftime('%s', ts_end) - strftime('%s', ts_start))
+		FROM block
+		WHERE ts_start >= ? AND ts_end <= ?
+	`
+
+	var totalSeconds sql.NullInt64
+	err := s.DB.QueryRow(
+		query,
+		startOfDay.UTC().Format(time.RFC3339),
+		endOfDay.UTC().Format(time.RFC3339),
+	).Scan(&totalSeconds)
+
+	if err != nil {
+		return 0, fmt.Errorf("failed to query daily total: %w", err)
+	}
+
+	if !totalSeconds.Valid {
+		return 0, nil
+	}
+
+	return totalSeconds.Int64, nil
 }

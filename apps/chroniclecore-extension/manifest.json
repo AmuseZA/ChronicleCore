@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ChronicleCore Time Tracker",
-  "version": "1.0.0",
+  "version": "2.1.0",
   "description": "Automatically track browser activity for time tracking and billing. Generates human-readable activity descriptions.",
   "permissions": [
     "tabs",
@@ -10,11 +10,23 @@
   ],
   "host_permissions": [
     "http://127.0.0.1:8080/*",
-    "http://localhost:8080/*"
+    "http://localhost:8080/*",
+    "<all_urls>"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true
+    }
   ],
   "background": {
-    "service_worker": "background.js",
-    "type": "module"
+    "service_worker": "background.js"
   },
   "action": {
     "default_popup": "popup/popup.html",
